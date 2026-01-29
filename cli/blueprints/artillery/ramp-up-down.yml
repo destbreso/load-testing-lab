@@ -1,0 +1,68 @@
+# Ramp-Up/Ramp-Down Load Test Blueprint (Artillery)
+#
+# Purpose: Gradually increase request rate to find capacity limits
+#
+# Use cases:
+# - Capacity planning
+# - Finding breaking points
+# - Testing auto-scaling behavior
+# - Observing performance degradation patterns
+#
+# Pattern:
+# 1. Warm-up with moderate load
+# 2. Ramp up to high load
+# 3. Hold at peak
+# 4. Ramp down
+# 5. Cool down
+
+config:
+  target: "${TARGET_API_URL}"
+  
+  phases:
+    - duration: 120           # 2 minutes - warm up
+      arrivalRate: 25
+      rampTo: 50
+      name: "Warm up"
+    
+    - duration: 300           # 5 minutes - ramp to moderate
+      arrivalRate: 50
+      rampTo: 100
+      name: "Ramp up to moderate"
+    
+    - duration: 600           # 10 minutes - hold at moderate
+      arrivalRate: 100
+      name: "Hold moderate load"
+    
+    - duration: 180           # 3 minutes - spike to peak
+      arrivalRate: 100
+      rampTo: 200
+      name: "Spike to peak"
+    
+    - duration: 300           # 5 minutes - ramp down
+      arrivalRate: 200
+      rampTo: 50
+      name: "Ramp down"
+    
+    - duration: 300           # 5 minutes - cool down
+      arrivalRate: 50
+      rampTo: 0
+      name: "Cool down"
+  
+  plugins:
+    statsd:
+      host: telegraf
+      port: 8125
+  
+  ensure:
+    maxErrorRate: 5           # Allow 5% errors under high load
+    p95: 1000                 # More lenient threshold for ramp tests
+
+scenarios:
+  - name: "API health check"
+    weight: 1
+    flow:
+      - get:
+          url: "/api/health"
+          expect:
+            - statusCode: 200
+      - think: 1

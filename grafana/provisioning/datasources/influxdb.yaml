@@ -1,0 +1,34 @@
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB
+    type: influxdb
+    uid: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    isDefault: true
+    jsonData:
+      version: Flux
+      organization: myorg
+      defaultBucket: loadtests
+      tlsSkipVerify: true
+    secureJsonData:
+      token: 6jK9Va9JAtKbDmX9OXDfF5Bn7qpgsQIVpFWir_HXU91oXOr9-62bIrWLfDm_3R7AsT3eaQBSBt-o8t6ELGUDhQ==
+
+# apiVersion: 1
+
+# datasources:
+#   - name: InfluxDB
+#     type: influxdb
+#     access: proxy
+#     url: http://influxdb:8086
+#     isDefault: true
+
+#     jsonData:
+#       dbName: loadtests
+#       httpMode: POST
+
+#     secureJsonData:
+#       password: admin123
+
+#     user: admin

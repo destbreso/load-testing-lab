@@ -1,0 +1,61 @@
+{
+  "name": "load-testing-lab",
+  "version": "1.0.0",
+  "description": "Reusable, containerized load testing lab for APIs using k6 and Artillery",
+  "type": "module",
+  "bin": {
+    "ltlab": "./cli/index.js"
+  },
+  "scripts": {
+    "cli": "node ./cli/index.js",
+    "start": "node ./cli/index.js start",
+    "stop": "node ./cli/index.js stop",
+    "reset": "node ./cli/index.js reset",
+    "restart": "node ./cli/index.js restart",
+    "rebuild": "node ./cli/index.js rebuild",
+    "purge": "node ./cli/index.js purge",
+    "k6": "node ./cli/index.js k6",
+    "artillery": "node ./cli/index.js artillery",
+    "info": "node ./cli/index.js info",
+    "configure": "node ./cli/index.js configure",
+    "scale": "node ./cli/index.js scale",
+    "chaos": "node ./cli/index.js chaos",
+    "metrics": "node ./cli/index.js metrics",
+    "start:lab": "docker-compose up -d",
+    "stop:lab": "docker-compose down",
+    "reset:metrics": "node ./scripts/reset-metrics.js",
+    "run:k6": "bash ./scripts/run-k6.sh",
+    "run:artillery": "bash ./scripts/run-artillery.sh",
+    "dev": "docker-compose up -d && echo 'Lab is up!'",
+    "start:prod": "docker-compose -f docker-compose.prod.yml up -d",
+    "stop:prod": "docker-compose -f docker-compose.prod.yml down",
+    "scale:k6": "docker-compose -f docker-compose.prod.yml up -d --scale k6=${REPLICAS:-3}",
+    "scale:artillery": "docker-compose -f docker-compose.prod.yml up -d --scale artillery=${REPLICAS:-2}",
+    "test:env": "echo 'TARGET_API_URL=' $TARGET_API_URL && echo 'CONCURRENCY=' $CONCURRENCY && echo 'DURATION=' $DURATION",
+    "influx:token": "node scripts/generate-influx-token.js",
+    "check-influx": "node scripts/check-influx-token.js",
+    "tail-influx": "node scripts/tail-influx.js"
+  },
+  "dependencies": {
+    "artillery": "^2.0.0-29",
+    "axios": "^1.13.2",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2",
+    "dotenv": "^17.2.3",
+    "execa": "^9.6.1",
+    "inquirer": "^13.2.1"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "load-testing",
+    "k6",
+    "artillery",
+    "docker",
+    "api-testing",
+    "performance"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

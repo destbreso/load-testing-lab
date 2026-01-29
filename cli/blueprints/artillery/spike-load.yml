@@ -1,0 +1,87 @@
+# Spike Load Test Blueprint (Artillery)
+#
+# Purpose: Test system behavior under sudden, dramatic load increases
+#
+# Use cases:
+# - Testing auto-scaling responsiveness
+# - Validating circuit breakers and rate limiters
+# - Simulating viral traffic (e.g., flash sales, breaking news)
+# - Testing elasticity and recovery
+# - Finding bottlenecks under sudden load
+#
+# Pattern:
+# 1. Low baseline load
+# 2. Sudden spike to 20x baseline
+# 3. Hold spike
+# 4. Drop back to baseline
+# 5. Observe recovery
+
+config:
+  target: "${TARGET_API_URL}"
+  
+  phases:
+    - duration: 120           # 2 minutes - baseline
+      arrivalRate: 10
+      name: "Baseline"
+    
+    - duration: 30            # 30 seconds - SPIKE!
+      arrivalRate: 10
+      rampTo: 200
+      name: "SPIKE - sudden increase"
+    
+    - duration: 180           # 3 minutes - hold spike
+      arrivalRate: 200
+      name: "Hold spike load"
+    
+    - duration: 30            # 30 seconds - drop
+      arrivalRate: 200
+      rampTo: 10
+      name: "Drop to baseline"
+    
+    - duration: 180           # 3 minutes - recovery
+      arrivalRate: 10
+      name: "Recovery period"
+    
+    - duration: 60            # 1 minute - cool down
+      arrivalRate: 10
+      rampTo: 0
+      name: "Cool down"
+  
+  plugins:
+    statsd:
+      host: telegraf
+      port: 8125
+  
+  ensure:
+    maxErrorRate: 10          # Allow up to 10% errors during spike
+    p50: 500                  # Median should stay reasonable
+    p95: 2000                 # 95th can be higher during spike
+
+scenarios:
+  # Mix of endpoints to simulate realistic traffic
+  - name: "Health endpoint"
+    weight: 3                 # 60% of traffic
+    flow:
+      - get:
+          url: "/api/health"
+          expect:
+            - statusCode: [200, 429]  # Accept rate limiting
+      - think: "random(0,2)"
+  
+  - name: "Status endpoint"
+    weight: 1                 # 20% of traffic
+    flow:
+      - get:
+          url: "/api/status"
+          expect:
+            - statusCode: [200, 429]
+      - think: "random(0,2)"
+  
+  - name: "Info endpoint"
+    weight: 1                 # 20% of traffic
+    flow:
+      - get:
+          url: "/api/info"
+          expect:
+            - statusCode: [200, 429]
+      - think: "random(0,2)"

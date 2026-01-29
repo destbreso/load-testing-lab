@@ -1,0 +1,10 @@
+http-bind-address: ":8086"
+
+storage-path: /var/lib/influxdb2
+
+log-level: info
+
+query-concurrency: 10
+query-queue-size: 10
+
+reporting-disabled: false

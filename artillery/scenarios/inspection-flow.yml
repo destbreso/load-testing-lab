@@ -1,0 +1,20 @@
+config:
+  target: "${TARGET_API_URL}"
+  phases:
+    - duration: 60
+      arrivalRate: 50
+  defaults:
+    headers:
+      Content-Type: "application/json"
+  
+  # StatsD plugin to send metrics to Telegraf -> InfluxDB
+  plugins:
+    statsd:
+      host: telegraf
+      port: 8125
+      prefix: "artillery"
+
+scenarios:
+  - flow:
+      - get:
+          url: "/inspections"

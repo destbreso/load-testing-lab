@@ -1,0 +1,51 @@
+# Steady Load Test Blueprint (Artillery)
+#
+# Purpose: Maintain constant request rate to establish baseline performance
+#
+# Use cases:
+# - Baseline performance testing
+# - Finding average response times
+# - Establishing normal behavior patterns
+# - Smoke testing before heavier load
+#
+# Customize:
+# - Adjust arrivalRate for desired requests per second
+# - Change duration based on test requirements
+# - Replace /api/health with your actual endpoints
+# - Add more scenarios for different user flows
+# - Configure expectations for validation
+
+config:
+  target: "${TARGET_API_URL}"
+  
+  # Test phases - constant load for 10 minutes
+  phases:
+    - duration: 600           # 10 minutes in seconds
+      arrivalRate: 50         # 50 requests/second (constant)
+      name: "Steady load"
+  
+  # Plugins for enhanced functionality
+  plugins:
+    statsd:
+      host: telegraf
+      port: 8125
+  
+  # Performance expectations
+  ensure:
+    maxErrorRate: 1           # Max 1% error rate
+    p95: 500                  # 95th percentile < 500ms
+    p99: 1000                 # 99th percentile < 1000ms
+
+scenarios:
+  - name: "Health check flow"
+    flow:
+      - get:
+          url: "/api/health"
+          # Response validation
+          capture:
+            - json: "$.status"
+              as: "healthStatus"
+          expect:
+            - statusCode: 200
+            - contentType: json
+      - think: 1              # 1 second delay (simulates user think time)

@@ -1,0 +1,69 @@
+config:
+  target: "{{ $processEnvironment.TARGET_API_URL }}"
+  phases:
+    - duration: 20
+      arrivalRate: 5
+      name: "Normal load"
+    - duration: 30
+      arrivalRate: 30
+      name: "Spike - Chaos!"
+    - duration: 40
+      arrivalRate: 30
+      name: "Sustained chaos"
+    - duration: 30
+      arrivalRate: 5
+      name: "Recovery"
+  plugins:
+    statsd:
+      host: telegraf
+      port: 8125
+      prefix: "artillery"
+  ensure:
+    maxErrorRate: 60  # Allow 60% errors during chaos
+    p99: 5000         # 99th percentile under 5 seconds
+
+scenarios:
+  - name: "Everything Goes Wrong"
+    weight: 10
+    flow:
+      # Hit all problematic endpoints in sequence
+      - get:
+          url: "/slow"
+          expect:
+            - statusCode: 200
+      
+      - think: 0.2
+      
+      - get:
+          url: "/error"
+          # May fail - that's expected in chaos
+      
+      - think: 0.2
+      
+      - get:
+          url: "/cpu"
+          expect:
+            - statusCode: 200
+      
+      - think: 0.2
+      
+      - get:
+          url: "/io"
+          expect:
+            - statusCode: 200
+      
+      # Longer think time after experiencing chaos
+      - think: 3
+
+  - name: "Rapid Fire Chaos"
+    weight: 5
+    flow:
+      # Rapid requests to random endpoints
+      - loop:
+        - get:
+            url: "/{{ $randomString() }}"
+            # Random URLs - some will 404, simulating user errors
+        - think: 0.1
+        count: 10
+      
+      - think: 2

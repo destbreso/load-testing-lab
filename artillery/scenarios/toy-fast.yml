@@ -1,0 +1,17 @@
+config:
+  target: "{{ $processEnvironment.TARGET_API_URL }}"
+  phases:
+    - duration: 30
+      arrivalRate: 50
+  
+  # StatsD plugin to send metrics to Telegraf -> InfluxDB
+  plugins:
+    statsd:
+      host: "{{ $processEnvironment.STATSD_HOST }}"
+      port: "{{ $processEnvironment.STATSD_PORT }}"
+      prefix: "artillery"
+
+scenarios:
+  - flow:
+      - get:
+          url: "/fast"

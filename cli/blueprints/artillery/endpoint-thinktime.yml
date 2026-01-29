@@ -1,0 +1,16 @@
+config:
+  target: "${TARGET_API_URL}"
+  phases:
+    - duration: 300
+      arrivalRate: 30
+scenarios:
+  - flow:
+      - get:
+          url: "/users"
+      - think: 2
+      - post:
+          url: "/login"
+          json:
+            username: "test"
+            password: "1234"
+      - think: 3

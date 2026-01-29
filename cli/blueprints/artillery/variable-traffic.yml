@@ -1,0 +1,10 @@
+config:
+  target: "${TARGET_API_URL}"
+  phases:
+    - duration: 600
+      arrivalRate: 20
+scenarios:
+  - flow:
+      - get:
+          url: "/endpoint"
+      - think: "random(0,2)"

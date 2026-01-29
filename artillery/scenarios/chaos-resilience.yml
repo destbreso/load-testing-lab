@@ -1,0 +1,84 @@
+config:
+  target: "{{ $processEnvironment.TARGET_API_URL }}"
+  phases:
+    - duration: 60
+      arrivalRate: 15
+      name: "Gradual ramp up"
+    - duration: 180
+      arrivalRate: 20
+      name: "Sustained load with retries"
+    - duration: 30
+      arrivalRate: 5
+      name: "Cool down"
+  plugins:
+    statsd:
+      host: telegraf
+      port: 8125
+      prefix: "artillery"
+  ensure:
+    maxErrorRate: 40
+    p95: 4000
+
+scenarios:
+  - name: "Retry Logic Testing"
+    weight: 10
+    flow:
+      # Test error endpoint with retry logic
+      - get:
+          url: "/error"
+          # First attempt - might fail
+      
+      - think: 0.5
+      
+      # Retry if previous failed (simulated by just calling again)
+      - get:
+          url: "/error"
+      
+      - think: 1
+      
+      # Third attempt if needed
+      - get:
+          url: "/error"
+          expect:
+            # By third attempt, we expect success (probability-wise)
+            - statusCode: [200, 500]  # Accept both
+      
+      - think: 2
+
+  - name: "Mixed Reliability"
+    weight: 5
+    flow:
+      # Test system reliability with various endpoints
+      - loop:
+        - get:
+            url: "/fast"
+            expect:
+              - statusCode: 200
+        
+        - think: 0.3
+        
+        - get:
+            url: "/error"
+            # May fail
+        
+        - think: 0.3
+        
+        - get:
+            url: "/slow"
+            expect:
+              - statusCode: 200
+        
+        - think: 0.3
+        
+        count: 2
+      
+      # Resource-intensive endpoints
+      - get:
+          url: "/cpu"
+      
+      - think: 0.5
+      
+      - get:
+          url: "/io"
+      
+      - think: 1.5

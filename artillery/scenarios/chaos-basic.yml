@@ -1,0 +1,67 @@
+config:
+  target: "{{ $processEnvironment.TARGET_API_URL }}"
+  phases:
+    - duration: 30
+      arrivalRate: 10
+      name: "Ramp up"
+    - duration: 60
+      arrivalRate: 20
+      name: "Sustained chaos"
+    - duration: 20
+      arrivalRate: 5
+      name: "Cool down"
+  processor: "./chaos-processor.js"
+  plugins:
+    statsd:
+      host: telegraf
+      port: 8125
+      prefix: "artillery"
+
+scenarios:
+  - name: "Mixed Chaos Scenario"
+    weight: 10
+    flow:
+      # Random selection of chaotic endpoints
+      - loop:
+        - get:
+            url: "/fast"
+            capture:
+              - json: "$.ok"
+                as: "fast_ok"
+        - think: 0.5
+        
+        - get:
+            url: "/slow"
+            expect:
+              - statusCode: 200
+        - think: 1
+        
+        - get:
+            url: "/error"
+            # Allow failures - this is chaos testing!
+        - think: 0.3
+        
+        - get:
+            url: "/cpu"
+            expect:
+              - statusCode: 200
+              - contentType: json
+        - think: 0.5
+        
+        count: 3
+      
+      # Final think time
+      - think: 2
+
+  - name: "Error Resilience"
+    weight: 5
+    flow:
+      # Focus on error-prone endpoint
+      - loop:
+        - get:
+            url: "/error"
+            # No expectations - we want to see how it behaves under chaos
+        - think: 0.5
+        count: 5
+      
+      - think: 1
