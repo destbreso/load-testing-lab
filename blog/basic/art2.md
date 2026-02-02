@@ -112,25 +112,34 @@ This clears InfluxDB data and ensures dashboards reflect only the new test.
 
 ## 4. Run a Sample Load Test
 
-### Using k6
+### Using the CLI (Recommended)
+
+The lab includes a professional CLI. Install it globally:
+
+```bash
+npm link
+```
 
 Run a prebuilt k6 scenario:
 
 ```bash
-docker-compose run --rm k6 run /k6/scenarios/inspection-flow.js
+ltlab k6 -s toy-fast.js
 ```
 
-You can monitor output in the terminal, but metrics will also flow to InfluxDB for visualization.
-
-### Using Artillery
-
-Similarly, you can run an Artillery scenario:
+Run an Artillery scenario:
 
 ```bash
-docker-compose run --rm artillery run /artillery/scenarios/inspection-flow.yml
+ltlab artillery -s basic.yml
 ```
 
-Artillery supports YAML scenario definitions, which makes it easy to configure multiple endpoints, arrival patterns, and virtual users.
+### Using Docker Compose (Alternative)
+
+```bash
+docker-compose run --rm k6 run /k6/scenarios/toy-fast.js
+docker-compose run --rm artillery run /artillery/scenarios/basic.yml
+```
+
+Metrics flow automatically to InfluxDB for visualization.
 
 ---
 
@@ -152,7 +161,8 @@ The dashboards are prebuilt and included in `grafana/dashboards`, ready to displ
 When done, shut down all containers cleanly:
 
 ```bash
-docker-compose down
+ltlab stop
+# Or: docker-compose down
 ```
 
 This stops all services and cleans up resources.
@@ -199,6 +209,27 @@ You can now adapt the lab to any API:
 * Add new k6 or Artillery scenarios in `k6/scenarios/` or `artillery/scenarios/`
 * Modify concurrency and duration settings in `.env` or within scenario files
 * Extend dashboards in Grafana to visualize new metrics
+
+### Using Your Own Test Files (External Projects)
+
+You don't need to copy files into the lab! The CLI auto-detects local files:
+
+```bash
+# From your project directory
+cd ~/projects/my-api
+
+# Run your local test file
+ltlab k6 -s ./tests/stress-test.js
+
+# For scenarios with imports, use project mode
+ltlab k6 -p ./tests -s main.js
+
+# Add custom dashboards
+ltlab dashboard link ./tests/dashboards
+ltlab restart -s grafana
+```
+
+**📚 Full guide:** [External Projects Guide](../../docs/EXTERNAL_PROJECTS.md)
 
 ---
 

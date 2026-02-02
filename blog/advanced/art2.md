@@ -104,10 +104,22 @@ toy-api     <built locally>          Up
 
 ## **4. Running Your First Test**
 
-The lab includes several pre-configured scenarios. Let's run a simple one:
+The lab includes several pre-configured scenarios. First, install the CLI:
+
+```bash
+npm link
+```
+
+### Using the CLI (Recommended)
 
 ```bash
 # Run the toy-fast scenario (50 VUs for 30 seconds)
+ltlab k6 -s toy-fast.js
+```
+
+### Using Docker Compose (Alternative)
+
+```bash
 docker-compose run --rm k6 run /k6/scenarios/toy-fast.js
 ```
 
@@ -133,7 +145,8 @@ You'll see k6 output with real-time metrics:
 **Testing with Artillery:**
 
 ```bash
-docker-compose run --rm artillery run /artillery/scenarios/toy-fast.yml
+ltlab artillery -s basic.yml
+# Or: docker-compose run --rm artillery run /artillery/scenarios/basic.yml
 ```
 
 ## **5. Access Grafana**
@@ -220,16 +233,42 @@ This stops all containers and frees up resources.
 
 ---
 
-## **10. Switching Between Projects**
+## **10. Testing External APIs & Your Own Projects**
 
-One of the lab’s strengths is **reusability**. To test another API:
+One of the lab's strengths is **flexibility**. You have two approaches:
+
+### Option A: Configure the Lab
 
 1. Update `TARGET_API_URL` in `.env`
-2. Add or modify k6/Artillery scenario scripts
+2. Add scenarios in `k6/scenarios/` or `artillery/scenarios/`
 3. Reset metrics if necessary
 4. Run the test again
 
-You don’t need to rebuild containers—your lab stack is ready for any project.
+### Option B: Keep Tests in Your Project (Recommended)
+
+Use the CLI to run tests from **any directory** without copying files:
+
+```bash
+# From your project directory
+cd ~/projects/my-api
+
+# Run your local test file (auto-detected)
+ltlab k6 -s ./tests/load/stress-test.js
+
+# For scenarios with imports/helpers, mount the project
+ltlab k6 -p ./tests/load -s main.js
+
+# Link your custom dashboards
+ltlab dashboard link ./tests/load/dashboards
+ltlab restart -s grafana
+```
+
+**Benefits:**
+- Tests live with your code (versioned together)
+- No duplication across projects
+- The lab stays generic and clean
+
+**📚 Full guide:** [External Projects Guide](../../docs/EXTERNAL_PROJECTS.md)
 
 ---
 

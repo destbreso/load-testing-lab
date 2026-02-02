@@ -37,6 +37,8 @@ This blog series is designed to be read **sequentially**, building knowledge fro
 ✅ **Grafana insights** - References to actual dashboards (UIDs included)  
 ✅ **Hands-on exercises** - Experiments you can run immediately  
 
+> 💡 **CLI vs Docker Compose**: Articles may show `docker-compose run --rm k6 run ...` commands. You can use the simpler CLI equivalent: `ltlab k6 -s scenario.js`. Both work identically. Run `npm link` first to enable the CLI.  
+
 ---
 
 ## 🎯 Learning Path
@@ -216,14 +218,14 @@ artillery-pro       → Professional Artillery (UID: artillery-pro)
 ## 🚀 Quick Start Commands
 
 ```bash
-# 1. Start the lab
-docker-compose up -d
+# 1. Install CLI globally
+npm link
 
-# 2. Verify services
-docker-compose ps
+# 2. Start the lab
+ltlab start
 
 # 3. Run your first test
-docker-compose run --rm k6 run /k6/scenarios/toy-fast.js
+ltlab k6 -s toy-fast.js
 
 # 4. View results
 open http://localhost:3000  # Grafana (admin/admin123)
@@ -231,10 +233,28 @@ open http://localhost:3000  # Grafana (admin/admin123)
 # 5. Explore toy-api
 curl http://localhost:5000/health
 curl http://localhost:5000/fast
-curl -X POST http://localhost:5000/jobs \
-  -H "Content-Type: application/json" \
-  -d '{"task":"test"}'
 ```
+
+### Using Your Own Test Files (External Projects)
+
+The CLI automatically detects local files - no need to copy them into the lab:
+
+```bash
+# From your project directory
+cd ~/projects/my-api
+
+# Run your local k6 test (auto-detects local file)
+ltlab k6 -s ./tests/load/stress-test.js
+
+# For scenarios with imports/helpers, use project mode
+ltlab k6 -p ./tests/load -s main.js
+
+# Link your custom dashboards
+ltlab dashboard link ./tests/load/dashboards
+ltlab restart -s grafana
+```
+
+**📚 Full guide:** [External Projects Guide](../docs/EXTERNAL_PROJECTS.md)
 
 ---
 
@@ -293,6 +313,8 @@ By completing this series, you'll be able to:
 ✨ Apply chaos engineering principles  
 ✨ Optimize APIs based on data  
 ✨ Speak confidently about p50/p95/p99  
+✨ **Use the lab with your own projects** (external scenarios & dashboards)  
+✨ **Create custom dashboards for domain-specific metrics**  
 
 ---
 

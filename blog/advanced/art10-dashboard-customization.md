@@ -531,6 +531,78 @@ See [CONTRIBUTING.md](../../CONTRIBUTING.md) for details.
 
 ---
 
+## **Keeping Dashboards in Your Project (External Projects)**
+
+When working on real projects, you'll want to keep custom dashboards **alongside your API code** - not inside the lab. This way:
+
+- Your dashboards are versioned with your project
+- The lab remains clean and generic
+- Multiple team members can share the same dashboards
+
+### **The Workflow**
+
+```bash
+# 1. Create dashboards in your project
+my-api/
+  src/
+  tests/
+    load/
+      scenarios/       # k6 test files
+      dashboards/      # Custom Grafana dashboards
+        my-api-metrics.json
+        llm-cost-tracker.json
+```
+
+```bash
+# 2. Link dashboards to the lab (copies to custom/ folder)
+cd ~/projects/my-api
+ltlab dashboard link ./tests/load/dashboards
+
+# 3. Restart Grafana to load them
+ltlab restart -s grafana
+
+# 4. View in Grafana - dashboards appear under "custom" folder
+open http://localhost:3000
+```
+
+### **Keeping in Sync**
+
+Your project folder is the **source of truth**. When you update a dashboard:
+
+```bash
+# After editing dashboards in your project
+ltlab dashboard link ./tests/load/dashboards
+ltlab restart -s grafana
+```
+
+### **Why This Works**
+
+- The lab's `custom/` folder is **ignored by git**
+- Your project tracks the dashboards in its own repo
+- No duplication or sync issues
+- Works across teams and machines
+
+### **Complete Example**
+
+```bash
+# Your e-commerce API project
+cd ~/projects/ecommerce-api
+
+# Run load tests with your scenarios
+ltlab k6 -p ./tests/load -s checkout-flow.js
+
+# Add your custom conversion dashboard
+ltlab dashboard link ./tests/load/dashboards
+
+# Restart and view
+ltlab restart -s grafana
+open http://localhost:3000
+```
+
+**📚 Full guide:** [External Projects Guide](../../docs/EXTERNAL_PROJECTS.md)
+
+---
+
 **Next Steps:**
 - Explore [CI/CD Integration (art5)](art5.md) for automated custom metric tracking
 - Review [Performance Optimization (art8)](art8.md) using custom metrics to drive improvements

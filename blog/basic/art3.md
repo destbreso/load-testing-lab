@@ -47,6 +47,10 @@ export default function () {
 3. Run the scenario:
 
 ```bash
+# Using CLI (recommended)
+ltlab k6 -s ramp-up.js
+
+# Or using Docker Compose
 docker-compose run --rm k6 run /k6/scenarios/ramp-up.js
 ```
 
@@ -92,6 +96,10 @@ export default function () {
 2. Run:
 
 ```bash
+# Using CLI (recommended)
+ltlab k6 -s custom-burst.js
+
+# Or using Docker Compose
 docker-compose run --rm k6 run /k6/scenarios/custom-burst.js
 ```
 
@@ -248,6 +256,18 @@ Ready to level up? The **Advanced Series** takes you deeper:
 - **[Chaos Testing](../advanced/art7.md)** - Network delays, failure injection, extreme scenarios
 - **[Performance Optimization](../advanced/art8.md)** - Turn metrics into actionable improvements
 - **[Cross-Ecosystem Strategies](../advanced/art9.md)** - Apply principles to Sentry, Datadog, cloud platforms
+- **[Dashboard Customization](../advanced/art10-dashboard-customization.md)** - Create custom metrics and dashboards
+
+### **Using Your Own Projects:**
+Don't want to copy files into the lab? Use your test files from any directory:
+
+```bash
+cd ~/projects/my-api
+ltlab k6 -s ./tests/load/stress-test.js
+ltlab dashboard link ./tests/load/dashboards
+```
+
+**📚 Full guide:** [External Projects Guide](../../docs/EXTERNAL_PROJECTS.md)
 
 ### **Complete Roadmap:**
 - **[Series Overview](../advanced/art0.md)** - See all 10+ articles with reading times and objectives
