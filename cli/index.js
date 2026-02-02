@@ -553,4 +553,14 @@ if (!process.argv.slice(2).length) {
   program.help();
 }
 
+// Handle graceful exit on Ctrl+C during prompts
+process.on("uncaughtException", (error) => {
+  if (error.name === "ExitPromptError" || error.message?.includes("SIGINT")) {
+    console.log(chalk.dim("\n\n👋 Cancelled by user"));
+    process.exit(0);
+  }
+  // Re-throw other errors
+  throw error;
+});
+
 program.parse();
