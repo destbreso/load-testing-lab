@@ -119,7 +119,7 @@ load_test:
     - docker:dind
   script:
     - docker-compose up -d
-    - docker-compose run --rm k6 run /k6/scenarios/inspection-flow.js
+    - docker-compose run --rm k6 run /k6/scenarios/custom-flow.js
     - docker-compose down
   only:
     - main

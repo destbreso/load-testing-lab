@@ -29,13 +29,13 @@ Testing against real dependencies is risky: production data can be corrupted, ra
 
 **Load Testing Lab includes a complete mock API** called `toy-api` with 8 pre-configured endpoints:
 
-* `/fast` - Quick responses (~5ms)
-* `/slow` - Simulated slow queries (~500ms)
+* `/fast` - Quick responses (~10ms)
+* `/slow` - Variable latency (500-2500ms)
 * `/cpu` - CPU-intensive operations
-* `/io` - I/O bound operations
-* `/error` - Random errors for failure testing
+* `/io` - I/O operations (300-1500ms)
+* `/error` - Random errors (30% failure rate)
 * `/jobs` - Async job creation
-* `/users` - CRUD operations
+* `/users` - Returns 50 mock users
 * `/health` - Health check endpoint
 
 Additionally, the toy-api includes a **fake background worker** that processes jobs asynchronously, letting you test queue behavior and worker latency.
@@ -55,12 +55,12 @@ The toy-api provides diverse endpoints to test different scenarios:
 ```javascript
 // Available endpoints in toy-api/src/index.js
 app.use("/health", health);   // Health check
-app.use("/fast", fast);       // Fast responses (~5ms)
-app.use("/slow", slow);       // Slow responses (~500ms)
-app.use("/error", error);     // Random errors
+app.use("/fast", fast);       // Fast responses (~10ms)
+app.use("/slow", slow);       // Variable latency (500-2500ms)
+app.use("/error", error);     // Random errors (30% failure rate)
 app.use("/cpu", cpu);         // CPU-bound operations
-app.use("/io", io);           // I/O operations
-app.use("/users", users);     // User CRUD with synthetic data
+app.use("/io", io);           // I/O operations (300-1500ms)
+app.use("/users", users);     // Returns 50 mock users
 app.use("/jobs", jobs);       // Async job creation
 ```
 

@@ -133,16 +133,16 @@ Or create your own files anywhere and run them directly!
 
 ## 📖 Documentation
 
-| Guide                                                   | Description                                    |
-|---------------------------------------------------------|------------------------------------------------|
-| **[📘 Complete Documentation](docs/README.md)**         | Master documentation hub                       |
-| **[🎯 External Projects Guide](docs/EXTERNAL_PROJECTS.md)** | **NEW** - Use with your own projects       |
-| **[⚙️ Setup Guide](docs/SETUP.md)**                     | Installation, configuration, environment setup |
-| **[▶️ Usage Guide](docs/USAGE.md)**                     | Running tests with k6 and Artillery            |
-| **[📊 Dashboard Guide](docs/DASHBOARDS.md)**            | 6 Grafana dashboards explained                 |
-| **[🔧 Troubleshooting](docs/TROUBLESHOOTING.md)**       | Common issues and solutions                    |
-| **[🤝 Contributing](docs/CONTRIBUTING.md)**             | How to contribute                              |
-| **[📋 Changelog](docs/CHANGELOG.md)**                   | Version history                                |
+| Guide                                                       | Description                                    |
+|-------------------------------------------------------------|------------------------------------------------|
+| **[📘 Complete Documentation](docs/README.md)**             | Master documentation hub                       |
+| **[🎯 External Projects Guide](docs/EXTERNAL_PROJECTS.md)** | **NEW** - Use with your own projects           |
+| **[⚙️ Setup Guide](docs/SETUP.md)**                         | Installation, configuration, environment setup |
+| **[▶️ Usage Guide](docs/USAGE.md)**                         | Running tests with k6 and Artillery            |
+| **[📊 Dashboard Guide](docs/DASHBOARDS.md)**                | 6 Grafana dashboards explained                 |
+| **[🔧 Troubleshooting](docs/TROUBLESHOOTING.md)**           | Common issues and solutions                    |
+| **[🤝 Contributing](docs/CONTRIBUTING.md)**                 | How to contribute                              |
+| **[📋 Changelog](docs/CHANGELOG.md)**                       | Version history                                |
 
 ---
 
@@ -195,14 +195,14 @@ ltlab dashboard link ./my-dashboards     # Link external dashboards
 ### 🎪 Built-in Test API
 **8 realistic endpoints (Toy API):**
 
-- `/fast` - Low latency baseline
-- `/slow` - Variable latency (2-5s)
-- `/error` - Controlled failures (30%)
+- `/health` - Health check
+- `/fast` - Instant response (~10ms)
+- `/slow` - Variable latency (500-2500ms)
+- `/error` - Random failures (30% failure rate)
 - `/cpu` - CPU-intensive workload
-- `/memory` - Memory-intensive operations
-- `/workers` - Async worker simulation
-- `/inspect` - Full flow inspection
-- `/random` - Random latency
+- `/io` - Simulated I/O operations (300-1500ms)
+- `/users` - JSON dataset (50 users)
+- `/jobs` - Async job creation + status
 
 Test and Learn without external dependencies!
 
@@ -240,25 +240,25 @@ flowchart LR
 
 ### Who This Is For
 
-| User Type             | Use Case                                                        |
-|-----------------------|-----------------------------------------------------------------|
-| **Students**          | Learn load testing best practices with full code access         |
-| **QA Engineers**      | Run tests with custom scenarios from external project folders   |
-| **Backend Engineers** | Validate API scalability, keep tests in your API project        |
-| **DevOps/SRE Teams**  | CI/CD integration with external scenario management             |
-| **Startups**          | Quick setup for pre-launch performance validation               |
-| **Enterprises**       | Centralized lab, distributed test scenarios per team            |
-| **Contributors**      | Extend platform, add features, fix bugs                         |
+| User Type             | Use Case                                                      |
+|-----------------------|---------------------------------------------------------------|
+| **Students**          | Learn load testing best practices with full code access       |
+| **QA Engineers**      | Run tests with custom scenarios from external project folders |
+| **Backend Engineers** | Validate API scalability, keep tests in your API project      |
+| **DevOps/SRE Teams**  | CI/CD integration with external scenario management           |
+| **Startups**          | Quick setup for pre-launch performance validation             |
+| **Enterprises**       | Centralized lab, distributed test scenarios per team          |
+| **Contributors**      | Extend platform, add features, fix bugs                       |
 
 ### External Projects vs Built-in Scenarios
 
-| Feature             | Built-in Scenarios                         | External Projects                          |
-|---------------------|--------------------------------------------|--------------------------------------------|
-| **Location**        | Inside `k6/scenarios/`, `artillery/scenarios/` | Any folder on your system                |
-| **Command**         | `ltlab k6 -s toy-fast.js`                 | `ltlab k6 -s ./my-test.js`                |
-| **With helpers**    | N/A                                        | `ltlab k6 -p ./my-project -s main.js`     |
-| **Dashboards**      | In `grafana/dashboards/`                   | `ltlab dashboard link ./my-dashboards`    |
-| **Best For**        | Learning, quick tests                      | Real projects, team workflows             |
+| Feature          | Built-in Scenarios                             | External Projects                      |
+|------------------|------------------------------------------------|----------------------------------------|
+| **Location**     | Inside `k6/scenarios/`, `artillery/scenarios/` | Any folder on your system              |
+| **Command**      | `ltlab k6 -s toy-fast.js`                      | `ltlab k6 -s ./my-test.js`             |
+| **With helpers** | N/A                                            | `ltlab k6 -p ./my-project -s main.js`  |
+| **Dashboards**   | In `grafana/dashboards/`                       | `ltlab dashboard link ./my-dashboards` |
+| **Best For**     | Learning, quick tests                          | Real projects, team workflows          |
 
 **📚 See [External Projects Guide](docs/EXTERNAL_PROJECTS.md) for complete examples.**
 
@@ -296,16 +296,16 @@ Topics covered:
 
 ## 📊 Project Status
 
-| Component                | Status     | Notes                         |
-|--------------------------|------------|-------------------------------|
-| **k6 + xk6-influxdb**    | 🟢 Working | Auto-configured, zero setup   |
-| **Artillery + Telegraf** | 🟢 Working | StatsD integration complete   |
-| **InfluxDB v2**          | 🟢 Working | Time-series storage ready     |
-| **Grafana**              | 🟢 Working | 6 dashboards auto-provisioned |
-| **Professional CLI**     | 🟢 Working | 18 commands available         |
+| Component                | Status     | Notes                           |
+|--------------------------|------------|---------------------------------|
+| **k6 + xk6-influxdb**    | 🟢 Working | Auto-configured, zero setup     |
+| **Artillery + Telegraf** | 🟢 Working | StatsD integration complete     |
+| **InfluxDB v2**          | 🟢 Working | Time-series storage ready       |
+| **Grafana**              | 🟢 Working | 6 dashboards auto-provisioned   |
+| **Professional CLI**     | 🟢 Working | 18 commands available           |
 | **External Projects**    | 🟢 Working | Mount scenarios from any folder |
-| **Custom Dashboards**    | 🟢 Working | Link/copy external dashboards |
-| **Toy API**              | 🟢 Working | 8 test endpoints              |
+| **Custom Dashboards**    | 🟢 Working | Link/copy external dashboards   |
+| **Toy API**              | 🟢 Working | 8 test endpoints                |
 
 ---
 

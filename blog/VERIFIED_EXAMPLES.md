@@ -81,49 +81,49 @@ curl http://localhost:5000/health
 ```
 **Response:**
 ```json
-{"status":"ok","uptime":123.45}
+{"status":"ok","ts":1706097000000}
 ```
 
-### Fast Endpoint (~5ms)
+### Fast Endpoint (~10ms)
 ```bash
 curl http://localhost:5000/fast
 ```
 **Response:**
 ```json
-{"message":"Fast response","timestamp":"2026-01-24T10:30:00.000Z","duration":"5ms"}
+{"ok":true,"speed":"fast","ts":1706097000000}
 ```
 
-### Slow Endpoint (~500ms)
+### Slow Endpoint (500-2500ms variable)
 ```bash
 curl http://localhost:5000/slow
 ```
 **Response:**
 ```json
-{"message":"Slow query simulated","timestamp":"2026-01-24T10:30:00.000Z","duration":"500ms"}
+{"ok":true,"speed":"slow"}
 ```
 
-### Error Endpoint (Random Failures)
+### Error Endpoint (30% failure rate)
 ```bash
 curl http://localhost:5000/error
 ```
 **Response (random):**
 ```json
 // 70% success
-{"message":"Success","timestamp":"2026-01-24T10:30:00.000Z"}
+{"ok":true}
 
-// 30% failure
-{"error":"Random error occurred","code":500}
+// 30% failure (HTTP 500)
+{"error":"Random failure"}
 ```
 
 ### Create Async Job
 ```bash
 curl -X POST http://localhost:5000/jobs \
   -H "Content-Type: application/json" \
-  -d '{"task":"process_data","priority":"high"}'
+  -d '{"mode":"fast"}'
 ```
 **Response:**
 ```json
-{"jobId":"job-abc-123","status":"pending","created":"2026-01-24T10:30:00.000Z"}
+{"accepted":true,"jobId":"abc123","mode":"fast","status":"pending"}
 ```
 
 ### Check Job Status

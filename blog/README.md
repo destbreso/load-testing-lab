@@ -179,14 +179,14 @@ Before starting, ensure you have:
 ### **Toy API Endpoints** (Your Testing Playground)
 ```
 GET  /health   → Health check
-GET  /fast     → Quick responses (~5ms)
-GET  /slow     → Simulated slow queries (~500ms)
+GET  /fast     → Quick responses (~10ms)
+GET  /slow     → Variable latency (500-2500ms)
 GET  /cpu      → CPU-intensive operations
-GET  /io       → I/O-bound operations
-GET  /error    → Random failures (chaos testing)
+GET  /io       → I/O operations (300-1500ms)
+GET  /error    → Random failures (30% error rate)
 POST /jobs     → Create async job
 GET  /jobs/:id → Check job status
-GET  /users    → User CRUD operations
+GET  /users    → Returns 50 mock users
 ```
 
 ### **k6 Scenarios** (Pre-configured Tests)

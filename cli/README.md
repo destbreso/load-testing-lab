@@ -387,7 +387,7 @@ ltlab k6 -p <project-dir> -s <scenario>
 # Built-in scenarios:
 ltlab k6 -s my-test.js
 ltlab k6 -s spike-load.js
-ltlab k6  # Runs default: inspection-flow.js
+ltlab k6  # Interactive - select scenario
 
 # External local files (auto-detected):
 ltlab k6 -s ./tests/my-test.js

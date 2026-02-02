@@ -322,7 +322,7 @@ The lab is **infrastructure**. Your project is the **source of truth** for its t
 
 - **Port**: 5000
 - **Purpose**: Built-in API for testing
-- **Endpoints**: 8 different behaviors (fast, slow, error, spike, etc.)
+- **Endpoints**: 8 different behaviors (health, fast, slow, error, cpu, io, users, jobs)
 - **Documentation**: [Toy API README](../toy-api/README.md)
 
 ---
