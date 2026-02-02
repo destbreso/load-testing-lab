@@ -115,14 +115,15 @@ open http://localhost:3000
 
 ## Detailed Documentation
 
-| Document | Description |
-|----------|-------------|
-| **[SETUP.md](SETUP.md)** | Installation, configuration, and environment setup |
-| **[USAGE.md](USAGE.md)** | Running tests with k6, Artillery, and CLI |
-| **[DASHBOARDS.md](DASHBOARDS.md)** | Grafana dashboards guide and query reference |
-| **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** | Common issues and solutions |
-| **[CONTRIBUTING.md](CONTRIBUTING.md)** | How to contribute to the project |
-| **[CHANGELOG.md](CHANGELOG.md)** | Version history and changes |
+| Document                                         | Description                                             |
+|--------------------------------------------------|---------------------------------------------------------|
+| **[SETUP.md](SETUP.md)**                         | Installation, configuration, and environment setup      |
+| **[USAGE.md](USAGE.md)**                         | Running tests with k6, Artillery, and CLI               |
+| **[EXTERNAL_PROJECTS.md](EXTERNAL_PROJECTS.md)** | **NEW** - Use with your own projects and external files |
+| **[DASHBOARDS.md](DASHBOARDS.md)**               | Grafana dashboards guide and query reference            |
+| **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**     | Common issues and solutions                             |
+| **[CONTRIBUTING.md](CONTRIBUTING.md)**           | How to contribute to the project                        |
+| **[CHANGELOG.md](CHANGELOG.md)**                 | Version history and changes                             |
 
 ### Additional Resources
 
@@ -144,7 +145,9 @@ open http://localhost:3000
 | **Toy API**              | 🟢 Working | Test API with 8 endpoints          |
 | **Artillery + Telegraf** | 🟢 Working | Transparent integration via StatsD |
 | **Docker Compose**       | 🟢 Working | Complete stack in containers       |
-| **Professional CLI**     | 🟢 Working | 16 commands for full control       |
+| **Professional CLI**     | 🟢 Working | 18 commands for full control       |
+| **External Projects**    | 🟢 Working | Mount scenarios from any folder    |
+| **Custom Dashboards**    | 🟢 Working | Link/copy external dashboards      |
 
 ---
 

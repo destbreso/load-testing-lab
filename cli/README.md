@@ -10,7 +10,9 @@ Professional command-line interface for managing the Load Testing Lab. Execute k
   - [Core Commands](#core-commands)
   - [Scenario Management](#scenario-management)
   - [Test Execution](#test-execution)
+  - [Dashboard Management](#dashboard-management)
   - [Advanced Commands](#advanced-commands)
+- [External Projects](#external-projects)
 - [Workflows](#workflows)
 - [Blueprint System](#blueprint-system)
 - [Configuration](#configuration)
@@ -380,19 +382,41 @@ Run a k6 load test scenario.
 **Usage:**
 ```bash
 ltlab k6 -s <scenario>
+ltlab k6 -p <project-dir> -s <scenario>
 
-# Examples:
+# Built-in scenarios:
 ltlab k6 -s my-test.js
 ltlab k6 -s spike-load.js
 ltlab k6  # Runs default: inspection-flow.js
+
+# External local files (auto-detected):
+ltlab k6 -s ./tests/my-test.js
+ltlab k6 -s /absolute/path/to/test.js
+
+# Project with helpers/imports:
+ltlab k6 -p ./my-project/tests -s main.js
 ```
 
 **Options:**
-- `-s, --scenario <file>`: Scenario file to run (relative to `k6/scenarios/`)
+- `-s, --scenario <file>`: Scenario file to run
+- `-p, --project <dir>`: Mount entire project directory (for scenarios with helpers/data)
 
-**Requirements:**
-- Lab must be running (`ltlab start`)
-- Scenario file must exist in `k6/scenarios/`
+**Auto-detection:**
+- If file exists locally → mounts parent directory and runs it
+- If file doesn't exist locally → uses built-in scenario from `k6/scenarios/`
+
+**Project mode (`-p`):**
+Use when your scenario imports other files:
+```bash
+# Structure:
+# my-tests/
+#   main.js       ← imports helpers.js
+#   helpers.js
+#   data/users.json
+
+ltlab k6 -p ./my-tests -s main.js
+# Mounts entire directory at /project, imports work correctly
+```
 
 **Results:**
 - Real-time metrics in terminal
@@ -408,24 +432,65 @@ Run an Artillery load test scenario.
 **Usage:**
 ```bash
 ltlab artillery -s <scenario>
+ltlab artillery -p <project-dir> -s <scenario>
 
-# Examples:
+# Built-in scenarios:
 ltlab artillery -s my-test.yml
 ltlab artillery -s steady-load.yml
 ltlab artillery  # Runs default: inspection-flow.yml
+
+# External local files:
+ltlab artillery -s ./tests/load.yml
+
+# Project with data files:
+ltlab artillery -p ./my-tests -s stress.yml
 ```
 
 **Options:**
-- `-s, --scenario <file>`: Scenario file to run (relative to `artillery/scenarios/`)
-
-**Requirements:**
-- Lab must be running (`ltlab start`)
-- Scenario file must exist in `artillery/scenarios/`
+- `-s, --scenario <file>`: Scenario file to run
+- `-p, --project <dir>`: Mount entire project directory (for scenarios with data files)
 
 **Results:**
 - Real-time metrics in terminal (via Telegraf)
 - Historical data in InfluxDB
 - Dashboards in Grafana: http://localhost:3000
+
+---
+
+#### `ltlab dashboard`
+
+Manage custom Grafana dashboards from external projects.
+
+**Usage:**
+```bash
+# Link dashboards from your project (copies JSON files to custom/ folder)
+ltlab dashboard link ~/projects/my-api/dashboards
+
+# List current dashboards
+ltlab dashboard list
+
+# Remove custom dashboards
+ltlab dashboard unlink
+```
+
+**Actions:**
+- `link <dir>`: Copy dashboards from external directory to `grafana/dashboards/custom/`
+- `copy <dir>`: Alias for `link` (same behavior)
+- `list`: List all dashboards (built-in and custom)
+- `unlink`: Remove the `custom/` folder with all linked dashboards
+
+**After linking:**
+```bash
+ltlab restart -s grafana
+# Dashboards appear in Grafana under "custom" folder
+```
+
+**Workflow:**
+- Your project folder is the **source of truth**
+- The lab's `custom/` folder is ignored by git
+- To sync changes from your project, run `link` again
+
+**See also:** [External Projects Guide](../docs/EXTERNAL_PROJECTS.md)
 
 ---
 

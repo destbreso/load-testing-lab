@@ -25,6 +25,7 @@ import chaosTest from "./commands/chaos.js";
 import showMetrics from "./commands/metrics.js";
 import runCmd from "./commands/run.js";
 import generateCmd from "./commands/generate.js";
+import dashboardCmd from "./commands/dashboard.js";
 
 // Determinar __dirname en ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -349,6 +350,7 @@ program
   .command("k6")
   .description("Run k6 load tests")
   .option("-s, --scenario <file>", "Scenario file to run", "inspection-flow.js")
+  .option("-p, --project <dir>", "Mount entire project directory (for scenarios with helpers/data)")
   .addHelpText(
     "after",
     `
@@ -357,13 +359,22 @@ ${chalk.bold("Description:")}
   Results are sent to InfluxDB and visible in Grafana.
 
 ${chalk.bold("Examples:")}
-  ${chalk.green("ltlab k6 -s my-test.js")}       ${chalk.dim("Run specific k6 scenario")}
-  ${chalk.green("ltlab k6 -s spike-load.js")}    ${chalk.dim("Run spike test")}
-  ${chalk.green("ltlab k6")}                     ${chalk.dim("Run default scenario")}
+  ${chalk.green("ltlab k6 -s my-test.js")}                        ${chalk.dim("Run specific k6 scenario")}
+  ${chalk.green("ltlab k6 -s ./tests/api-test.js")}               ${chalk.dim("Run local file (auto-detected)")}
+  ${chalk.green("ltlab k6 -p ./my-project -s main.js")}           ${chalk.dim("Mount project dir with helpers")}
+  ${chalk.green("ltlab k6 -p ~/projects/api/tests -s flow.js")}   ${chalk.dim("External project with imports")}
 
-${chalk.bold("Requirements:")}
-  - Lab must be running (ltlab start)
-  - Scenario must exist in k6/scenarios/
+${chalk.bold("Project Mode (-p):")}
+  Use when your scenario imports other files (helpers, data, etc.)
+  The entire directory is mounted at /project in the container.
+
+  ${chalk.dim("Example structure:")}
+    my-tests/
+      main.js          ${chalk.dim("← scenario (imports helpers.js)")}
+      helpers.js       ${chalk.dim("← shared functions")}
+      data/users.json  ${chalk.dim("← test data")}
+
+  ${chalk.dim("Run with:")} ltlab k6 -p ./my-tests -s main.js
 
 ${chalk.bold("Monitoring:")}
   View results in Grafana: ${chalk.cyan(`http://localhost:${process.env.GRAFANA_PORT || 3000}`)}
@@ -379,6 +390,7 @@ program
     "Scenario file to run",
     "inspection-flow.yml",
   )
+  .option("-p, --project <dir>", "Mount entire project directory (for scenarios with data files)")
   .addHelpText(
     "after",
     `
@@ -387,13 +399,13 @@ ${chalk.bold("Description:")}
   Metrics are collected via Telegraf and stored in InfluxDB.
 
 ${chalk.bold("Examples:")}
-  ${chalk.green("ltlab artillery -s my-test.yml")}     ${chalk.dim("Run specific Artillery scenario")}
-  ${chalk.green("ltlab artillery -s steady-load.yml")} ${chalk.dim("Run steady load test")}
-  ${chalk.green("ltlab artillery")}                    ${chalk.dim("Run default scenario")}
+  ${chalk.green("ltlab artillery -s my-test.yml")}              ${chalk.dim("Run specific Artillery scenario")}
+  ${chalk.green("ltlab artillery -s ./tests/load.yml")}         ${chalk.dim("Run local file (auto-detected)")}
+  ${chalk.green("ltlab artillery -p ./my-tests -s main.yml")}   ${chalk.dim("Mount project dir with data")}
 
-${chalk.bold("Requirements:")}
-  - Lab must be running (ltlab start)
-  - Scenario must exist in artillery/scenarios/
+${chalk.bold("Project Mode (-p):")}
+  Use when your scenario needs additional files (CSV data, configs, etc.)
+  The entire directory is mounted at /project in the container.
 
 ${chalk.bold("Monitoring:")}
   View results in Grafana: ${chalk.cyan(`http://localhost:${process.env.GRAFANA_PORT || 3000}`)}
@@ -503,6 +515,38 @@ ${chalk.bold("Better Alternative:")}
 `,
   )
   .action(showMetrics);
+
+// Dashboard management
+program
+  .command("dashboard [action] [source]")
+  .description("Manage custom Grafana dashboards")
+  .addHelpText(
+    "after",
+    `
+${chalk.bold("Description:")}
+  Link or copy external Grafana dashboards to the lab.
+  Allows using your own dashboards without modifying the project.
+
+${chalk.bold("Actions:")}
+  link <dir>    Symlink external dashboard directory (recommended)
+  copy <dir>    Copy dashboards to lab (permanent)
+  list          List current dashboards
+  unlink        Remove symlinked dashboards
+
+${chalk.bold("Examples:")}
+  ${chalk.green("ltlab dashboard link ~/projects/my-api/dashboards")}   ${chalk.dim("Link external dashboards")}
+  ${chalk.green("ltlab dashboard copy ./my-dashboards")}                 ${chalk.dim("Copy dashboards to lab")}
+  ${chalk.green("ltlab dashboard list")}                                 ${chalk.dim("List all dashboards")}
+  ${chalk.green("ltlab dashboard unlink")}                               ${chalk.dim("Remove linked dashboards")}
+
+${chalk.bold("Dashboard Format:")}
+  Grafana JSON export format. Export from Grafana UI or create manually.
+
+${chalk.bold("After linking/copying:")}
+  Restart Grafana: ${chalk.cyan("ltlab restart -s grafana")}
+`,
+  )
+  .action(dashboardCmd);
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {

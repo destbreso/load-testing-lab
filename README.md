@@ -10,32 +10,122 @@
 
 > **Production-ready load testing platform** with k6 + xk6-influxdb, Artillery, InfluxDB v2, and Grafana dashboards.
 
-A complete, containerized performance testing platform for modern APIs and microservices. Test under realistic load, visualize real-time metrics, and store historical data - all with zero configuration.
+A complete, containerized performance testing platform for modern APIs and microservices. Test under realistic load, visualize real-time metrics, and store historical data.
+
+**Includes everything:**
+- ✅ 6 Professional Grafana dashboards
+- ✅ Example k6 & Artillery scenarios  
+- ✅ Toy API (8 endpoints for testing)
+- ✅ Full InfluxDB v2 + Telegraf stack
+- ✅ CLI with 18 commands
+- ✅ **External project support** - Use your own scenarios from any folder
 
 ---
 
 ## 🚀 Quick Start
 
-Get running in 2 minutes:
-
 ```bash
-# 1. Clone and install
+# 1. Clone and install CLI globally
 git clone https://github.com/destbreso/load-testing-lab.git
 cd load-testing-lab
-npm install
+npm install && npm link
 
-# 2. Configure (interactive wizard)
-npm run configure
+# 2. Start the lab (InfluxDB, Grafana, Telegraf, Toy API)
+ltlab start
 
-# 3. Start services
-npm start
+# 3. Run tests with built-in scenarios
+ltlab k6 -s toy-fast.js
+ltlab artillery -s basic.yml
 
-# 4. Run your first test
-npm run k6 -- -s toy-fast.js
-
-# 5. View results
+# 4. View dashboards
 open http://localhost:3000  # Grafana (admin/admin123)
 ```
+
+---
+
+## 🎯 Using Your Own Scenarios (External Projects)
+
+The CLI automatically detects if you're pointing to a **local file** and mounts it into the container. No need to copy files into the lab project!
+
+### Simple Scenarios (Single File)
+
+```bash
+# From ANY directory, use your own test files
+cd ~/projects/my-api
+
+# Run your local k6 test (the CLI detects it's a local file)
+ltlab k6 -s ./load-tests/stress-test.js
+
+# Run your local Artillery test
+ltlab artillery -s ./load-tests/smoke-test.yml
+
+# You can also use absolute paths
+ltlab k6 -s /Users/me/projects/payment-api/tests/checkout.js
+```
+
+### Complex Scenarios (Multiple Files, Helpers, Data)
+
+For scenarios that import other files (helpers, data, configs), use the `-p, --project` option:
+
+```bash
+# Mount entire project directory
+ltlab k6 -p ./my-tests -s main.js
+ltlab artillery -p ./load-tests -s stress.yml
+```
+
+**Example structure:**
+```
+my-tests/
+  main.js           # ← scenario (imports helpers)
+  helpers.js        # ← shared functions  
+  config.js         # ← configuration
+  data/
+    users.json      # ← test data
+```
+
+```bash
+# Run with project mode
+ltlab k6 -p ./my-tests -s main.js
+# The entire directory is mounted, so imports work correctly
+```
+
+### Custom Grafana Dashboards
+
+Add your own dashboards without modifying the lab:
+
+```bash
+# Link dashboards from your project (copies to lab's custom/ folder)
+ltlab dashboard link ~/projects/my-api/dashboards
+
+# Restart Grafana to load them
+ltlab restart -s grafana
+
+# List current dashboards
+ltlab dashboard list
+
+# Remove custom dashboards
+ltlab dashboard unlink
+```
+
+> **Note:** Your project folder is the **source of truth**. The lab's `custom/` folder is ignored by git. To sync changes, run `link` again.
+
+**📚 Complete guide:** [External Projects Guide](docs/EXTERNAL_PROJECTS.md)
+
+---
+
+## 📊 Generate New Scenarios
+
+Create scenarios using blueprints:
+
+```bash
+# Generate in the lab's scenarios folder
+ltlab generate -e k6 -n my-test
+
+# Then run it
+ltlab k6 -s my-test.js
+```
+
+Or create your own files anywhere and run them directly!
 
 **🎓 New to load testing?** Check the [complete course at destbreso.com →](https://destbreso.com)
 
@@ -43,15 +133,16 @@ open http://localhost:3000  # Grafana (admin/admin123)
 
 ## 📖 Documentation
 
-| Guide                                             | Description                                    |
-|---------------------------------------------------|------------------------------------------------|
-| **[📘 Complete Documentation](docs/README.md)**   | Master documentation hub                       |
-| **[⚙️ Setup Guide](docs/SETUP.md)**               | Installation, configuration, environment setup |
-| **[▶️ Usage Guide](docs/USAGE.md)**               | Running tests with k6 and Artillery            |
-| **[📊 Dashboard Guide](docs/DASHBOARDS.md)**      | 6 Grafana dashboards explained                 |
-| **[🔧 Troubleshooting](docs/TROUBLESHOOTING.md)** | Common issues and solutions                    |
-| **[🤝 Contributing](docs/CONTRIBUTING.md)**       | How to contribute                              |
-| **[📋 Changelog](docs/CHANGELOG.md)**             | Version history                                |
+| Guide                                                   | Description                                    |
+|---------------------------------------------------------|------------------------------------------------|
+| **[📘 Complete Documentation](docs/README.md)**         | Master documentation hub                       |
+| **[🎯 External Projects Guide](docs/EXTERNAL_PROJECTS.md)** | **NEW** - Use with your own projects       |
+| **[⚙️ Setup Guide](docs/SETUP.md)**                     | Installation, configuration, environment setup |
+| **[▶️ Usage Guide](docs/USAGE.md)**                     | Running tests with k6 and Artillery            |
+| **[📊 Dashboard Guide](docs/DASHBOARDS.md)**            | 6 Grafana dashboards explained                 |
+| **[🔧 Troubleshooting](docs/TROUBLESHOOTING.md)**       | Common issues and solutions                    |
+| **[🤝 Contributing](docs/CONTRIBUTING.md)**             | How to contribute                              |
+| **[📋 Changelog](docs/CHANGELOG.md)**                   | Version history                                |
 
 ---
 
@@ -78,16 +169,25 @@ Real-time visualization of:
 - Bandwidth and network metrics
 
 ### Professional CLI
-**16 commands for streamlined testing:**
+**18 commands for streamlined testing:**
 
 ```bash
-npm run configure  # Interactive setup
-npm start          # Start lab
-npm run k6         # Run k6 tests
-npm run artillery  # Run Artillery tests
-npm run restart    # Restart services
-npm run rebuild    # Clean rebuild
-npm run purge      # Full reset
+ltlab configure   # Interactive setup
+ltlab start       # Start lab
+ltlab k6          # Run k6 tests (supports external files)
+ltlab artillery   # Run Artillery tests (supports external files)
+ltlab generate    # Generate scenarios from blueprints
+ltlab dashboard   # Manage custom Grafana dashboards
+ltlab restart     # Restart services
+ltlab rebuild     # Clean rebuild
+ltlab purge       # Full reset
+```
+
+**External project support:**
+```bash
+ltlab k6 -s ./local-file.js              # Auto-detect local files
+ltlab k6 -p ./my-project -s main.js      # Mount project with helpers
+ltlab dashboard link ./my-dashboards     # Link external dashboards
 ```
 
 **Full CLI documentation:** [cli/README.md](cli/README.md)
@@ -140,12 +240,27 @@ flowchart LR
 
 ### Who This Is For
 
-- **Students** - Learn load testing best practices
-- **Backend Engineers** - API scalability validation
-- **QA Engineers** - Repeatable performance testing
-- **SRE Teams** - Capacity planning and reliability
-- **Startups** - Pre-launch performance validation
-- **Enterprises** - CI/CD performance gates
+| User Type             | Use Case                                                        |
+|-----------------------|-----------------------------------------------------------------|
+| **Students**          | Learn load testing best practices with full code access         |
+| **QA Engineers**      | Run tests with custom scenarios from external project folders   |
+| **Backend Engineers** | Validate API scalability, keep tests in your API project        |
+| **DevOps/SRE Teams**  | CI/CD integration with external scenario management             |
+| **Startups**          | Quick setup for pre-launch performance validation               |
+| **Enterprises**       | Centralized lab, distributed test scenarios per team            |
+| **Contributors**      | Extend platform, add features, fix bugs                         |
+
+### External Projects vs Built-in Scenarios
+
+| Feature             | Built-in Scenarios                         | External Projects                          |
+|---------------------|--------------------------------------------|--------------------------------------------|
+| **Location**        | Inside `k6/scenarios/`, `artillery/scenarios/` | Any folder on your system                |
+| **Command**         | `ltlab k6 -s toy-fast.js`                 | `ltlab k6 -s ./my-test.js`                |
+| **With helpers**    | N/A                                        | `ltlab k6 -p ./my-project -s main.js`     |
+| **Dashboards**      | In `grafana/dashboards/`                   | `ltlab dashboard link ./my-dashboards`    |
+| **Best For**        | Learning, quick tests                      | Real projects, team workflows             |
+
+**📚 See [External Projects Guide](docs/EXTERNAL_PROJECTS.md) for complete examples.**
 
 
 ### What You Can Test
@@ -187,7 +302,9 @@ Topics covered:
 | **Artillery + Telegraf** | 🟢 Working | StatsD integration complete   |
 | **InfluxDB v2**          | 🟢 Working | Time-series storage ready     |
 | **Grafana**              | 🟢 Working | 6 dashboards auto-provisioned |
-| **Professional CLI**     | 🟢 Working | 16 commands available         |
+| **Professional CLI**     | 🟢 Working | 18 commands available         |
+| **External Projects**    | 🟢 Working | Mount scenarios from any folder |
+| **Custom Dashboards**    | 🟢 Working | Link/copy external dashboards |
 | **Toy API**              | 🟢 Working | 8 test endpoints              |
 
 ---
@@ -252,4 +369,4 @@ If this project helps you:
 
 **Ready to start?** → **[Setup Guide](docs/SETUP.md)** | **[Complete Documentation](docs/README.md)**
 
-**Last Updated:** January 29, 2026
+**Last Updated:** February 2, 2026
