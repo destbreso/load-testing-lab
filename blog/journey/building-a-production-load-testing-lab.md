@@ -42,11 +42,88 @@ And the worst part: no real-time visibility. I'd start a test, wait for it to co
 
 The approach worked, technically. But it didn't scale with the complexity of what I was trying to understand.
 
+### The Multi-Project Problem: One Stack Per Project?
+
+And then there was the elephant in the room that nobody seemed to talk about: what happens when you have multiple projects?
+
+I wasn't working on just one API. I had the LLM service, sure. But I also had a payment processing API. A user authentication service. A fleet management backend. Each needed load testing. Each had different performance characteristics, different endpoints, different concerns.
+
+The "obvious" solution was to set up a load testing stack for each project. k6, InfluxDB, Grafana, configuration files—duplicated into each repository. But this created its own nightmare:
+
+- **Configuration drift**: Each stack evolved independently. Bug fixes in one weren't propagated to others. Dashboard improvements stayed local.
+- **Onboarding friction**: New team members had to learn the setup for each project. "Oh, the payment API uses a slightly different Grafana version."
+- **Maintenance overhead**: Updating InfluxDB meant updating it in five places. Upgrading Grafana meant five upgrades. Each with its own configuration quirks.
+- **Wasted resources**: Running multiple InfluxDB and Grafana instances when you're only testing one project at a time.
+
+What I really wanted was simple: **one lab, many projects**. A single, well-maintained load testing environment that I could point at any project. The infrastructure stays in one place. The test scenarios and dashboards live with each project. When I switch from testing the payment API to testing the fleet management service, I don't reconfigure anything—I just point the lab at different test files.
+
+### Source of Truth: Where Should Tests Live?
+
+This led me to a deeper architectural question: where should the test code actually live?
+
+The traditional approach puts everything in the testing tool. Your load testing repo contains all scenarios for all projects. But this creates a strange coupling. The payment API team needs to make changes to the load testing repo to update their tests. The fleet management team does too. Suddenly everyone is committing to the same repo, dealing with merge conflicts, coordinating releases.
+
+The alternative is cleaner: **each project is the source of truth for its own tests**.
+
+Think about it:
+- The payment API team knows their API best. They should own their load test scenarios.
+- When they add a new endpoint, they add the corresponding test in the same PR.
+- Their custom dashboards live alongside their code, versioned together.
+- The load testing lab is just infrastructure—like Docker or CI runners.
+
+This separation has a beautiful property: **complexity is decoupled**.
+
+- Want to improve the lab? Update it once, everyone benefits.
+- Want to improve your project's tests? Update them in your repo, no coordination needed.
+- New team member joins? They learn the lab once, then find project-specific tests where they expect them—in the project.
+
+It's the same principle as keeping your Dockerfile in your project repo, not in a central "all Dockerfiles" repo. The infrastructure tool is generic; the configuration is specific to each use case.
+
+This became a core design goal that shaped the final architecture. The lab would be a shared tool, not embedded infrastructure. Projects would bring their own scenarios and dashboards, and the lab would run them without needing per-project setup.
+
 ### Industry Standard Tools: Powerful But Scattered
 
 Then there's k6 and Artillery. These are genuinely good tools. The load testing community swears by them for good reasons. They're powerful, flexible, battle-tested in production.
 
 But here's what the tutorials don't tell you: getting from "install k6" to "understand what's happening in my system" is a journey. You need k6. Then you need somewhere to store the metrics, so you set up InfluxDB. But which version? InfluxDB v1 and v2 are different beasts. Okay, InfluxDB v2 it is. Now you need to configure k6 to send metrics there. Oh, but k6 doesn't support InfluxDB v2 out of the box, you need an extension. Time to learn about xk6 and recompile k6 with the extension.
+
+### The Obvious Solution: Just a Docker Compose?
+
+At this point, you might be thinking: "Why not just create a docker-compose.yml with all the services? Problem solved."
+
+And you'd be right. That's the logical first approach. Wire up k6, InfluxDB, Grafana in a compose file, mount some volumes, done. I considered stopping there.
+
+In fact, I *did* stop there for years. I had a docker-compose setup that worked. When I needed load testing, I'd spin it up, run some tests, look at dashboards, shut it down. It solved the problem.
+
+But here's what I noticed over time: every time I came back to it after a few months, I had to re-learn it. How did I run tests again? What was the Grafana password? Which dashboard showed what I needed? The compose file worked, but my memory didn't persist between uses.
+
+And when I wanted to test a new project, or try a new dashboard, or onboard a teammate, the friction was real:
+
+- "Let me remember how this works..."
+- "Where did I put those example scenarios?"
+- "Was this the right InfluxDB query syntax?"
+- "Why isn't data showing up? Is it my test or the infrastructure?"
+
+A bare docker-compose.yml leaves you with these problems:
+
+- **How do you know it works?** You need something to test against. Your real API? That defeats the purpose of having an isolated lab.
+- **How do you learn the tools?** You have infrastructure, but no examples. Every test you write is from scratch.
+- **How do you onboard teammates?** "Here's the docker-compose, good luck figuring out how to use it."
+- **How do you verify the dashboards?** Grafana is running, but are the queries correct? Is data actually flowing?
+- **How do you remember it after 3 months?** You become your own new teammate, needing onboarding again.
+
+What I ended up building is that docker-compose solution, but **with steroids**:
+
+✅ **Toy API included** – 8 endpoints to test the stack, verify dashboards, and learn patterns  
+✅ **Ready-to-run scenarios** – Dozens of k6 and Artillery examples you can use immediately  
+✅ **Pre-configured dashboards** – 6 professional Grafana dashboards, tested and working  
+✅ **CLI for ergonomics** – `ltlab start` instead of remembering docker-compose flags  
+✅ **Extensive documentation** – 13-article course, troubleshooting guides, everything in one place  
+✅ **External project support** – Use with any project without copying files  
+
+The toy API alone changes everything. It's not just for testing—it's for *teaching*. New team member? "Run `ltlab k6 -s toy-fast.js` and look at the dashboard." Want to try a new dashboard panel? Test it against `/slow` or `/cpu`. Debugging why metrics aren't flowing? The toy API eliminates your application as a variable.
+
+So yes, at its core it's a docker-compose stack. But the value is in everything around it: the examples, the documentation, the CLI, the toy API. It's the difference between handing someone a toolkit and handing them a workshop.
 
 Now you have data flowing. But you want to see it, so you add Grafana. More configuration. Datasource setup. Dashboard creation. Learning Flux query language because InfluxDB v2 doesn't use SQL. Each step is documented somewhere, but you're stitching together knowledge from different sources, different versions, different assumptions about your setup.
 
@@ -468,6 +545,7 @@ If you want to understand the concepts and patterns in more depth, there's a [co
 For technical deep-dives into specific components:
 - [docs/DIAGNOSIS_AND_SOLUTION.md](../../docs/DIAGNOSIS_AND_SOLUTION.md) for troubleshooting k6, Artillery, InfluxDB, and Grafana integration
 - [docs/ARTILLERY_IMPLEMENTATION_SUMMARY.md](../../docs/ARTILLERY_IMPLEMENTATION_SUMMARY.md) for details on the Telegraf bridge architecture
+- [docs/EXTERNAL_PROJECTS.md](../../docs/EXTERNAL_PROJECTS.md) for using the lab with your own projects (scenarios and dashboards from any folder)
 - [END_TO_END_TESTING_GUIDE.md](../../END_TO_END_TESTING_GUIDE.md) for validation procedures and verification steps
 - [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md) for current status of all components
 
@@ -480,6 +558,39 @@ Building this lab reinforced something I've learned over years of development: t
 I didn't set out to build "the ultimate load testing platform." I set out to answer specific questions about my LLM service under load. The specificity of those questions drove every decision. What metrics to collect, what dashboards to build, what scenarios to include, what complexity to hide and what to expose.
 
 The generality came later, from making it reusable. But it started specific, solving a real problem I actually had.
+
+### The Multi-Project Vision Realized
+
+Remember the multi-project problem I mentioned earlier? The frustration of maintaining separate load testing stacks for each project?
+
+That became a core feature of the lab. Today, I can:
+
+```bash
+# Test my payment API
+cd ~/projects/payment-api
+ltlab k6 -s ./tests/load/checkout-stress.js
+ltlab dashboard link ./tests/load/dashboards
+
+# Switch to fleet management service
+cd ~/projects/fleet-api
+ltlab k6 -p ./tests/load -s main.js
+ltlab dashboard link ./tests/dashboards
+
+# All using the SAME lab infrastructure
+```
+
+Each project keeps its test scenarios and custom dashboards in its own repository. The lab remains a shared, well-maintained tool. When I upgrade Grafana or fix a dashboard issue, every project benefits. No more configuration drift. No more per-project maintenance overhead.
+
+The CLI auto-detects local files and mounts them dynamically. You don't copy files into the lab—you point the lab at your project. This inversion was key: the lab adapts to your projects, not the other way around.
+
+**Why this matters:**
+
+- **Cleaner organization**: Tests live with the code they test. No hunting across repos.
+- **Natural ownership**: Each team owns their tests. No coordination bottlenecks.
+- **Simpler onboarding**: "Here's the lab, here are our tests" instead of "here's our fork of the lab with our customizations."
+- **Robust upgrades**: Improve the lab → everyone benefits. Improve your tests → your project benefits. No entanglement.
+
+It's a pattern I try to apply repeatedly: separate the generic infrastructure from the specific configuration. Keep each in its natural home. Let them evolve independently.
 
 If you're building developer tools, or thinking about building one, my advice is this: start with the problem you actually have, not the problem you think other people might have. Build something that works for your specific case first. Make it work so well for that case that you'd rather use it than anything else. Then, and only then, think about how to make it general.
 

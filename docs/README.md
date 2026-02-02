@@ -52,15 +52,37 @@ The **Load Testing Lab** is a containerized platform for performance testing and
 - Artillery has no native InfluxDB v2 support
 - Grafana dashboard configuration is time-consuming
 - Token management and data sources must be manually synchronized
+- **Multiple projects = multiple stacks?** Duplicating infrastructure per project creates maintenance nightmares
 
-**Solution:** This lab provides:
-- ✅ Precompiled k6 with xk6-influxdb extension
+**The Multi-Project Problem:**
+If you have 3-5 projects that need load testing, the "obvious" solution is a stack per project. But this leads to:
+- Configuration drift between projects
+- Onboarding friction for new team members
+- 5x maintenance overhead for updates
+- Wasted resources running duplicate infrastructure
+
+**"Why not just a docker-compose.yml?"**
+
+You could wire up k6, InfluxDB, and Grafana in a compose file. That's the logical first step. And it works—I used exactly that for years.
+
+But here's what happens in practice: every time you come back after a few months, you re-learn it. "How did I run tests? What was the password? Which dashboard?" The compose file persists, but your memory doesn't.
+
+And when you want to test a new endpoint, try a new dashboard, or onboard a teammate:
+- How do you know the stack works? (Need something to test against)
+- How do you learn/remember the patterns? (No examples to start from)
+- How do you onboard teammates—or yourself after 3 months? (No documentation)
+- How do you verify dashboards are correct? (No known-good test data)
+
+**Solution:** This lab is that docker-compose approach, **but with steroids**:
+- ✅ **Toy API included** – 8 endpoints to test the stack, learn patterns, onboard teammates
+- ✅ **Ready-to-run scenarios** – Dozens of k6 and Artillery examples
+- ✅ **6 pre-configured dashboards** – Tested and working out of the box
+- ✅ **CLI for ergonomics** – `ltlab start` instead of docker-compose flags
+- ✅ **13-article course** – From basics to advanced, everything documented
+- ✅ **One lab, many projects** – Use with any project without per-project setup
+- ✅ **External scenarios & dashboards** – Keep tests in your project repos
+- ✅ Precompiled k6 with xk6-influxdb (no Go toolchain needed)
 - ✅ Artillery integration via Telegraf (transparent)
-- ✅ 6 pre-configured Grafana dashboards
-- ✅ Automatic token generation and synchronization
-- ✅ Professional CLI for streamlined workflows
-- ✅ Production and development modes
-- ✅ Built-in toy API for testing
 
 ### Who Is This For?
 
@@ -108,6 +130,56 @@ open http://localhost:3000
 - ✅ k6 reports metrics (http_req_duration, http_reqs, etc.)
 - ✅ Grafana displays data in dashboards
 - ✅ InfluxDB stores time-series metrics
+
+### Using the CLI (Recommended)
+
+```bash
+# Install CLI globally
+npm link
+
+# Start lab
+ltlab start
+
+# Run tests
+ltlab k6 -s toy-fast.js
+```
+
+### Using With Your Own Projects
+
+The CLI auto-detects local files—no need to copy them into the lab:
+
+```bash
+# From your project directory
+cd ~/projects/my-api
+
+# Run your local test (auto-mounted)
+ltlab k6 -s ./tests/load/stress-test.js
+
+# For scenarios with imports, use project mode
+ltlab k6 -p ./tests/load -s main.js
+
+# Add your custom dashboards
+ltlab dashboard link ./tests/load/dashboards
+ltlab restart -s grafana
+```
+
+**📚 Full guide:** [EXTERNAL_PROJECTS.md](EXTERNAL_PROJECTS.md)
+
+### Source of Truth: Each Project Owns Its Tests
+
+The lab is **infrastructure**. Your project is the **source of truth** for its tests and dashboards.
+
+| Component             | Lives in...       | Owned by...     |
+|-----------------------|-------------------|-----------------|
+| k6, Grafana, InfluxDB | The lab           | Lab maintainers |
+| Test scenarios        | Your project repo | Your team       |
+| Custom dashboards     | Your project repo | Your team       |
+
+**Benefits:**
+- Tests versioned with your code (same PR adds endpoint + test)
+- Natural team ownership (no coordination bottlenecks)
+- Clean separation (improve lab = everyone benefits; improve tests = your project benefits)
+- Simple onboarding (one lab to learn, tests where you expect them)
 
 **Next steps:** See [SETUP.md](SETUP.md) for detailed installation and [USAGE.md](USAGE.md) for running tests.
 

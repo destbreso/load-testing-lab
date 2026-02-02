@@ -6,6 +6,43 @@ This guide explains how to use Load Testing Lab to test **any project** without 
 
 ---
 
+## The Philosophy: Source of Truth
+
+The lab is **infrastructure**. Your project is the **source of truth**.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  LOAD TESTING LAB (shared infrastructure)                       │
+│  • k6 + xk6-influxdb                                            │
+│  • Artillery + Telegraf                                         │
+│  • InfluxDB v2                                                  │
+│  • Grafana + built-in dashboards                                │
+│  • CLI tools                                                    │
+└─────────────────────────────────────────────────────────────────┘
+                              ▲
+                              │ runs tests from
+                              │
+     ┌────────────────────────┼────────────────────────┐
+     │                        │                        │
+     ▼                        ▼                        ▼
+┌─────────────┐        ┌─────────────┐        ┌─────────────┐
+│ payment-api │        │ fleet-api   │        │ user-api    │
+│ └─tests/    │        │ └─tests/    │        │ └─tests/    │
+│   └─load/   │        │   └─load/   │        │   └─load/   │
+│     ├─*.js  │        │     ├─*.js  │        │     ├─*.js  │
+│     └─dash/ │        │     └─dash/ │        │     └─dash/ │
+└─────────────┘        └─────────────┘        └─────────────┘
+  (source of truth)      (source of truth)     (source of truth)
+```
+
+**Why this matters:**
+- **Tests live with code**: Add endpoint + test in the same PR
+- **Natural ownership**: Each team owns their tests
+- **Clean separation**: Improve lab → everyone benefits; improve tests → your project benefits
+- **Simple onboarding**: One lab to learn, tests where you expect them
+
+---
+
 ## Table of Contents
 
 - [Overview](#overview)
