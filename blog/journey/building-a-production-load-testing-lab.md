@@ -66,6 +66,7 @@ The traditional approach puts everything in the testing tool. Your load testing 
 The alternative is cleaner: **each project is the source of truth for its own tests**.
 
 Think about it:
+
 - The payment API team knows their API best. They should own their load test scenarios.
 - When they add a new endpoint, they add the corresponding test in the same PR.
 - Their custom dashboards live alongside their code, versioned together.
@@ -89,7 +90,7 @@ But here's what the tutorials don't tell you: getting from "install k6" to "unde
 
 ### The Obvious Solution: Just a Docker Compose?
 
-At this point, you might be thinking: "Why not just create a docker-compose.yml with all the services? Problem solved."
+At this point, you might be thinking: "Why not just create a central docker-compose.yml with all the services? Problem solved."
 
 And you'd be right. That's the logical first approach. Wire up k6, InfluxDB, Grafana in a compose file, mount some volumes, done. I considered stopping there.
 
@@ -543,6 +544,7 @@ The credentials are in the README (admin/admin123 for Grafana), and there's a co
 If you want to understand the concepts and patterns in more depth, there's a [complete tutorial series](../README.md) in the repository that walks through everything from basic load testing concepts to advanced scenarios, CI/CD integration, and chaos engineering. The same series is also published at [destbreso.com](https://destbreso.com) if you prefer reading in a browser with better formatting.
 
 For technical deep-dives into specific components:
+
 - [docs/DIAGNOSIS_AND_SOLUTION.md](../../docs/DIAGNOSIS_AND_SOLUTION.md) for troubleshooting k6, Artillery, InfluxDB, and Grafana integration
 - [docs/ARTILLERY_IMPLEMENTATION_SUMMARY.md](../../docs/ARTILLERY_IMPLEMENTATION_SUMMARY.md) for details on the Telegraf bridge architecture
 - [docs/EXTERNAL_PROJECTS.md](../../docs/EXTERNAL_PROJECTS.md) for using the lab with your own projects (scenarios and dashboards from any folder)
@@ -596,7 +598,7 @@ If you're building developer tools, or thinking about building one, my advice is
 
 Your specific problem is what gives you insight that generalized thinking can't. It's what helps you understand which complexity matters and which doesn't. It's what tells you where the rough edges are, what the common failure modes are, what questions people actually need answered.
 
-This lab exists because I had questions I couldn't answer with existing tools. Maybe you have questions too. Maybe this lab answers them. Or maybe you'll build something different that answers your specific questions better. Either way, start with the real problem. That's where good tools come from.
+This lab exists because I had questions I couldn't answer easily with existing tools...and also because it's fun. Maybe you have questions too. Maybe this lab answers them. Or maybe you'll build something different that answers your specific questions better. Either way, start with the real problem. That's where good tools come from.
 
 ---
 

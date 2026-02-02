@@ -26,8 +26,6 @@ Benefits of the online version:
 
 ---
 
----
-
 ## 📖 How to Use This Blog
 
 This blog series is designed to be read **sequentially**, building knowledge from basic concepts to advanced techniques. Each article includes:
