@@ -35,17 +35,17 @@ The **load-testing-lab** project exhibited the following symptoms:
 - Created a custom `entrypoint.sh` script that configures the correct environment variables for xk6-influxdb
 - The `xk6-influxdb` extension requires specific variables: `K6_INFLUXDB_ORGANIZATION`, `K6_INFLUXDB_BUCKET`, `K6_INFLUXDB_TOKEN`, etc.
 
-### 2. **Docker Compose does not expand variables within values**
+### 2. **The extension is not configured through query parameters**
 
-**Problem:** Docker Compose does not expand environment variables within the values of other environment variables. For example:
+**Problem:** The commented-out line passed the organization, bucket and token as query parameters of `K6_OUT`. Docker Compose does substitute `${INFLUXDB_ORG}` and the others from `.env`, so substitution was never the issue: xk6-output-influxdb takes the address in `K6_OUT` but reads the organization, bucket and token from its own variables, `K6_INFLUXDB_ORGANIZATION`, `K6_INFLUXDB_BUCKET` and `K6_INFLUXDB_TOKEN`, not from query parameters. For example:
 
 ```yaml
-- K6_OUT=xk6-influxdb=...?org=${INFLUXDB_ORG}  # ❌ ${INFLUXDB_ORG} does NOT expand
+- K6_OUT=xk6-influxdb=...?org=${INFLUXDB_ORG}  # ❌ the extension ignores these query parameters
 ```
 
 **Solution applied:** 
 
-- Created an `entrypoint.sh` that dynamically builds configuration variables using the available environment variables
+- Created an `entrypoint.sh` that maps the lab's `INFLUXDB_*` variables to the extension's `K6_INFLUXDB_*` variables and enables the output only when the organization, bucket and token are all set
 
 ### 3. **Incorrect Grafana token**
 
@@ -56,11 +56,11 @@ The **load-testing-lab** project exhibited the following symptoms:
 ```yaml
 # ❌ BEFORE
 secureJsonData:
-  token: 0XiVXLihj4Renb-sZPKQmIZ_35ot9x6DnryaiIN1rQAgHkXfDXmnTemWJcU69GI5M8dzZVeFfCPvzoMtAZsaRA==
+  token: <the token from .env>
 
 # ✅ AFTER (synchronized with .env)
 secureJsonData:
-  token: 6jK9Va9JAtKbDmX9OXDfF5Bn7qpgsQIVpFWir_HXU91oXOr9-62bIrWLfDm_3R7AsT3eaQBSBt-o8t6ELGUDhQ==
+  token: <the token from .env>
 ```
 
 ### 4. **k6 scripts with incorrect references**
@@ -173,7 +173,7 @@ docker-compose run --rm k6 run /k6/scenarios/toy-fast.js
 
 ### 3. View metrics in Grafana:
 
-- URL: http://localhost:3081
+- URL: http://localhost:3000
 - User: `admin`
 - Password: `admin123`
 

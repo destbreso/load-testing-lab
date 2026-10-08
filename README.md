@@ -35,7 +35,7 @@ ltlab start
 
 # 3. Run tests with built-in scenarios
 ltlab k6 -s toy-fast.js
-ltlab artillery -s basic.yml
+ltlab artillery -s toy-fast.yml
 
 # 4. View dashboards
 open http://localhost:3000  # Grafana (admin/admin123)

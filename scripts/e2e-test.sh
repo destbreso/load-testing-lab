@@ -125,7 +125,7 @@ echo ""
 
 # 7. Check Grafana dashboards
 echo "7️⃣ Checking Grafana dashboards..."
-GRAFANA_HEALTH=$(curl -s http://localhost:3081/api/health)
+GRAFANA_HEALTH=$(curl -s http://localhost:${GRAFANA_PORT:-3000}/api/health)
 
 if echo "$GRAFANA_HEALTH" | grep -q "ok"; then
     echo -e "${GREEN}✅ Grafana is healthy${NC}"
@@ -145,8 +145,8 @@ echo "   InfluxDB: Both tools writing successfully"
 echo "   Grafana: Dashboards accessible"
 echo ""
 echo "🌐 View dashboards:"
-echo "   Artillery: http://localhost:3081/d/artillery-telegraf"
-echo "   k6: http://localhost:3081/d/k6-dashboard"
+echo "   Artillery: http://localhost:${GRAFANA_PORT:-3000}/d/artillery-telegraf"
+echo "   k6: http://localhost:${GRAFANA_PORT:-3000}/d/k6-dashboard"
 echo ""
 echo "📁 Test logs saved:"
 echo "   Artillery: /tmp/artillery.log"

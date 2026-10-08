@@ -94,7 +94,7 @@ docker-compose ps
 NAME       IMAGE                   STATUS          PORTS
 influxdb   influxdb:2.6            Up 10 seconds   0.0.0.0:8086->8086/tcp
 telegraf   telegraf:1.28-alpine    Up 10 seconds   0.0.0.0:8125->8125/udp
-grafana    grafana/grafana:10.1.0  Up 10 seconds   0.0.0.0:3081->3000/tcp
+grafana    grafana/grafana:10.1.0  Up 10 seconds   0.0.0.0:3000->3000/tcp
 toy-api    load-testing-lab-toy-api Up 10 seconds  0.0.0.0:5081->5000/tcp
 ```
 
@@ -107,7 +107,7 @@ Test internal service connectivity:
 curl -I http://localhost:8086/health
 
 # Test Grafana
-curl -I http://localhost:3081/api/health
+curl -I http://localhost:3000/api/health
 
 # Test Toy API
 curl http://localhost:5081/fast
@@ -215,7 +215,7 @@ curl -s "http://localhost:8086/api/v2/query?org=${INFLUXDB_ORG}" \
 Open Grafana:
 
 ```bash
-open http://localhost:3081
+open http://localhost:3000
 ```
 
 **Login:** admin / admin (first time: skip password change)
@@ -357,7 +357,7 @@ docker-compose logs telegraf 2>&1 | grep -q "Started the statsd service" && echo
 # Check Grafana
 echo ""
 echo "4️⃣ Checking Grafana..."
-curl -sf http://localhost:3081/api/health > /dev/null && echo "✅ Grafana healthy" || echo "❌ Grafana unreachable"
+curl -sf http://localhost:3000/api/health > /dev/null && echo "✅ Grafana healthy" || echo "❌ Grafana unreachable"
 
 # Check metrics in last 5 minutes
 echo ""
@@ -541,7 +541,7 @@ cat grafana/provisioning/datasources/influxdb.yaml
 **Diagnosis:**
 ```bash
 # 1. Check Grafana datasource
-curl -u admin:admin http://localhost:3081/api/datasources
+curl -u admin:admin http://localhost:3000/api/datasources
 
 # 2. Test datasource connection
 # In Grafana UI: Configuration → Data Sources → InfluxDB → Save & Test
@@ -627,7 +627,7 @@ Error response from daemon: driver failed programming external connectivity
 ```bash
 # Check port conflicts
 lsof -i :8086  # InfluxDB
-lsof -i :3081  # Grafana
+lsof -i :3000  # Grafana
 lsof -i :8125  # Telegraf StatsD
 ```
 
@@ -756,7 +756,7 @@ Use this checklist to confirm complete end-to-end functionality:
 ### ✅ Infrastructure
 - [ ] All services start without errors
 - [ ] InfluxDB health check passes
-- [ ] Grafana accessible at http://localhost:3081
+- [ ] Grafana accessible at http://localhost:3000
 - [ ] Telegraf listening on UDP 8125
 
 ### ✅ Artillery Integration
@@ -857,8 +857,8 @@ echo "======================================"
 echo "✅ End-to-End Test PASSED"
 echo ""
 echo "📊 View dashboards:"
-echo "   Artillery: http://localhost:3081/d/artillery-telegraf"
-echo "   k6: http://localhost:3081/d/k6-dashboard"
+echo "   Artillery: http://localhost:3000/d/artillery-telegraf"
+echo "   k6: http://localhost:3000/d/k6-dashboard"
 echo ""
 echo "📁 Test logs saved:"
 echo "   Artillery: /tmp/artillery.log"
