@@ -10,7 +10,6 @@ config:
     - duration: 20
       arrivalRate: 5
       name: "Cool down"
-  processor: "./chaos-processor.js"
   plugins:
     statsd:
       host: telegraf

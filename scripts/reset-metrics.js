@@ -45,7 +45,8 @@ async function resetMetrics() {
           {
             start: "1970-01-01T00:00:00Z",
             stop: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
-            predicate: "_measurement=~/.*/", // Match all measurements
+            // No predicate: InfluxDB 2.x then deletes every point in the range.
+            // Its delete predicates do not support regular expressions.
           },
           {
             headers: {
