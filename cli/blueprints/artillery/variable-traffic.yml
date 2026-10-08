@@ -1,8 +1,13 @@
 config:
-  target: "${TARGET_API_URL}"
+  target: "{{ $processEnvironment.TARGET_API_URL }}"
   phases:
     - duration: 600
       arrivalRate: 20
+  plugins:
+    statsd:
+      host: "{{ $processEnvironment.STATSD_HOST }}"
+      port: "{{ $processEnvironment.STATSD_PORT }}"
+      prefix: "artillery"
 scenarios:
   - flow:
       - get:

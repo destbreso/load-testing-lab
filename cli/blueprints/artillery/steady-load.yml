@@ -16,7 +16,7 @@
 # - Configure expectations for validation
 
 config:
-  target: "${TARGET_API_URL}"
+  target: "{{ $processEnvironment.TARGET_API_URL }}"
   
   # Test phases - constant load for 10 minutes
   phases:
@@ -27,8 +27,9 @@ config:
   # Plugins for enhanced functionality
   plugins:
     statsd:
-      host: telegraf
-      port: 8125
+      host: "{{ $processEnvironment.STATSD_HOST }}"
+      port: "{{ $processEnvironment.STATSD_PORT }}"
+      prefix: "artillery"
   
   # Performance expectations
   ensure:

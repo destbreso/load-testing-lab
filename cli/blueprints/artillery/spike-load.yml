@@ -17,7 +17,7 @@
 # 5. Observe recovery
 
 config:
-  target: "${TARGET_API_URL}"
+  target: "{{ $processEnvironment.TARGET_API_URL }}"
   
   phases:
     - duration: 120           # 2 minutes - baseline
@@ -49,8 +49,9 @@ config:
   
   plugins:
     statsd:
-      host: telegraf
-      port: 8125
+      host: "{{ $processEnvironment.STATSD_HOST }}"
+      port: "{{ $processEnvironment.STATSD_PORT }}"
+      prefix: "artillery"
   
   ensure:
     maxErrorRate: 10          # Allow up to 10% errors during spike
