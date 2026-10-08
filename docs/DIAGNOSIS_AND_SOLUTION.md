@@ -67,7 +67,7 @@ secureJsonData:
 
 **Problem:** Some scripts tried to import a `config` variable that didn't exist.
 
-**Location:** [k6/scenarios/inspection-flow.js](k6/scenarios/inspection-flow.js#L17)
+**Location:** a k6 scenario that is no longer in the repository
 
 ```javascript
 // ❌ BEFORE
@@ -117,7 +117,6 @@ Synchronized the token with the one in the `.env` file.
 
 ### 5. Fixed k6 scripts
 
-- [k6/scenarios/inspection-flow.js](k6/scenarios/inspection-flow.js): Added config import
 - [k6/scenarios/toy-fast.js](k6/scenarios/toy-fast.js): Cleaned configuration
 
 ---
@@ -215,8 +214,7 @@ Artillery has plugins to send metrics:
 2. ✅ `k6/Dockerfile` - Updated
 3. ✅ `docker-compose.yml` - Updated
 4. ✅ `grafana/provisioning/datasources/influxdb.yaml` - Token fixed
-5. ✅ `k6/scenarios/inspection-flow.js` - Import added
-6. ✅ `k6/scenarios/toy-fast.js` - Cleaned
+5. ✅ `k6/scenarios/toy-fast.js` - Cleaned
 
 ---
 

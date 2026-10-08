@@ -195,7 +195,6 @@ toy-fast.js         → Basic load test (50 VUs, 30s)
 toy-stress.js       → Stress test (high concurrency)
 toy-mixed.js        → Multiple endpoints
 toy-workers.js      → Async job processing
-inspection-flow.js  → Multi-step user flow
 chaos-basic.js      → Mixed chaos (errors, latency, CPU)
 chaos-spike.js      → Traffic spike with failures
 chaos-resilience.js → Retry logic and recovery

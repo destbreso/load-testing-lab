@@ -349,7 +349,7 @@ ${chalk.red.bold("⚠️  WARNING:")} This action cannot be undone. All metrics 
 program
   .command("k6")
   .description("Run k6 load tests")
-  .option("-s, --scenario <file>", "Scenario file to run", "inspection-flow.js")
+  .option("-s, --scenario <file>", "Scenario file to run", "toy-fast.js")
   .option("-p, --project <dir>", "Mount entire project directory (for scenarios with helpers/data)")
   .addHelpText(
     "after",
@@ -388,7 +388,7 @@ program
   .option(
     "-s, --scenario <file>",
     "Scenario file to run",
-    "inspection-flow.yml",
+    "toy-fast.yml",
   )
   .option("-p, --project <dir>", "Mount entire project directory (for scenarios with data files)")
   .addHelpText(

@@ -437,7 +437,7 @@ ltlab artillery -p <project-dir> -s <scenario>
 # Built-in scenarios:
 ltlab artillery -s my-test.yml
 ltlab artillery -s steady-load.yml
-ltlab artillery  # Runs default: inspection-flow.yml
+ltlab artillery  # Runs default: toy-fast.yml
 
 # External local files:
 ltlab artillery -s ./tests/load.yml

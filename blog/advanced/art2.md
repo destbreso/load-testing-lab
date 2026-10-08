@@ -137,7 +137,6 @@ You'll see k6 output with real-time metrics:
 * `toy-stress.js` - Stress test with high concurrency
 * `toy-mixed.js` - Mixed endpoints testing
 * `toy-workers.js` - Tests async job processing
-* `inspection-flow.js` - Multi-step user flow simulation
 * `chaos-basic.js` - Mixed chaos engineering (errors, latency, CPU)
 * `chaos-spike.js` - Traffic spike with failures
 * `chaos-resilience.js` - Retry logic and recovery patterns
@@ -181,7 +180,7 @@ This will clear InfluxDB data so your next test results are isolated.
 k6 scripts are in `k6/scenarios/`. Let’s run a simple scenario:
 
 ```bash
-docker-compose run --rm k6 run /k6/scenarios/inspection-flow.js
+docker-compose run --rm k6 run /k6/scenarios/toy-mixed.js
 ```
 
 The script simulates concurrent requests to your target API. As it runs, metrics are automatically pushed to InfluxDB.
@@ -200,7 +199,7 @@ DURATION=120s
 Artillery is an alternative tool if you prefer YAML-defined scenarios:
 
 ```bash
-docker-compose run --rm artillery run /artillery/scenarios/inspection-flow.yml
+docker-compose run --rm artillery run /artillery/scenarios/toy-mixed.yml
 ```
 
 It supports complex workflows, payload variations, and ramp-up stages. Results are also pushed to InfluxDB.
