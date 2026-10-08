@@ -46,7 +46,7 @@
     "inquirer": "^13.2.1"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.13"
   },
   "keywords": [
     "load-testing",

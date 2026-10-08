@@ -108,7 +108,7 @@ For new features or improvements:
 
 - Docker >= 24.0
 - Docker Compose >= 2.18
-- Node.js >= 18
+- Node.js >= 22.13
 - Git
 
 ### Installation

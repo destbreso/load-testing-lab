@@ -100,7 +100,7 @@ And when you want to test a new endpoint, try a new dashboard, or onboard a team
 
 - Docker >= 24.0
 - Docker Compose >= 2.18
-- Node.js >= 18 (for CLI)
+- Node.js >= 22.13 (for CLI)
 
 ### 1-Minute Demo
 

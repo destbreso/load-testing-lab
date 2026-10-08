@@ -21,7 +21,7 @@ Complete installation and configuration guide for the Load Testing Lab.
 
 - **Docker** >= 24.0 ([Install Docker](https://docs.docker.com/get-docker/))
 - **Docker Compose** >= 2.18 (included with Docker Desktop)
-- **Node.js** >= 18 ([Install Node.js](https://nodejs.org/))
+- **Node.js** >= 22.13 ([Install Node.js](https://nodejs.org/))
 - **Git** (for cloning repository)
 
 ### System Requirements
@@ -36,7 +36,7 @@ Complete installation and configuration guide for the Load Testing Lab.
 ```bash
 docker --version          # Should show >= 24.0
 docker-compose --version  # Should show >= 2.18
-node --version           # Should show >= 18.x
+node --version           # Should show >= 22.13
 ```
 
 ---
