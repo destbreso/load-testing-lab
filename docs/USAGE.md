@@ -479,9 +479,9 @@ jobs:
 - **[DASHBOARDS.md](DASHBOARDS.md)** - Master Grafana visualization
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Fix common issues
 - **[CLI Documentation](../cli/README.md)** - Learn all CLI commands
-- **[Blog: Common Scenarios](../blog/advanced/art3.md)** - Realistic API testing examples
-- **[Blog: Quickstart Guide](../blog/advanced/art2.md)** - Extended setup and usage patterns
-- **[Blog Series Overview](../blog/README.md)** - Complete tutorial series
+- **[Blog: Common Scenarios](https://destbreso.com/blog/modeling-real-traffic-for-load-tests)** - Realistic API testing examples
+- **[Blog: Quickstart Guide](https://destbreso.com/blog/load-testing-lab-getting-started)** - Extended setup and usage patterns
+- **[Blog Series Overview](https://destbreso.com/blog/series/load-testing-lab-guide)** - Complete tutorial series
 
 ---
 

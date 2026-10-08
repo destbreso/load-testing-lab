@@ -127,7 +127,7 @@ ltlab k6 -s my-test.js
 
 Or create your own files anywhere and run them directly!
 
-**🎓 New to load testing?** Check the [complete course at destbreso.com →](https://destbreso.com)
+**🎓 New to load testing?** Check the [complete course at destbreso.com →](https://destbreso.com/blog/series/load-testing-lab-guide)
 
 ---
 
@@ -290,7 +290,6 @@ Topics covered:
 - Performance optimization
 - Real-world case studies
 
-**Also available locally:** [`/blog`](blog/README.md) folder
 
 ---
 
@@ -361,7 +360,7 @@ If this project helps you:
 - 🐛 Report issues or suggest features
 - 📖 Contribute documentation
 - 💬 Share with others
-- 📚 Read the [course on destbreso.com](https://destbreso.com)
+- 📚 Read the [course on destbreso.com](https://destbreso.com/blog/series/load-testing-lab-guide)
 
 **Made with ❤️ for the developer community**
 

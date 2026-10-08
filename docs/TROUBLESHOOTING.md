@@ -542,7 +542,7 @@ If you're still experiencing problems:
 2. **Review technical documentation:**
    - [DIAGNOSIS_AND_SOLUTION.md](DIAGNOSIS_AND_SOLUTION.md) - Deep technical troubleshooting
    - [PRODUCTION_MODE.md](PRODUCTION_MODE.md) - Production-specific issues
-   - [Blog: Performance Optimization](../blog/advanced/art8.md) - Diagnosing bottlenecks
+   - [Blog: Performance Optimization](https://destbreso.com/blog/from-load-test-metrics-to-performance-fixes) - Diagnosing bottlenecks
 
 3. **Reset everything (nuclear option):**
    ```bash
@@ -557,7 +557,7 @@ If you're still experiencing problems:
 
 4. **Get help:**
    - [GitHub Issues](https://github.com/destbreso/load-testing-lab/issues)
-   - Check [Blog Series](../blog/README.md) for tutorials
+   - Check [Blog Series](https://destbreso.com/blog/series/load-testing-lab-guide) for tutorials
    - Review [Setup Guide](SETUP.md) for proper configuration
 
 ---

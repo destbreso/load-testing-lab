@@ -403,8 +403,8 @@ node scripts/artillery-to-influx.js artillery/results/report.json
 4. Add usage examples
 
 **Related Resources:**
-- [Blog: Quickstart Guide](../blog/advanced/art2.md) - Extended setup with k6 and Artillery
-- [Blog: Common Scenarios](../blog/advanced/art3.md) - Practical Artillery examples
+- [Blog: Quickstart Guide](https://destbreso.com/blog/load-testing-lab-getting-started) - Extended setup with k6 and Artillery
+- [Blog: Common Scenarios](https://destbreso.com/blog/modeling-real-traffic-for-load-tests) - Practical Artillery examples
 - [USAGE.md](USAGE.md) - Complete usage guide with Artillery commands
 
 ---

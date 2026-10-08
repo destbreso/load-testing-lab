@@ -887,8 +887,8 @@ For additional help, see:
 - [ARTILLERY_INFLUXDB_GUIDE.md](ARTILLERY_INFLUXDB_GUIDE.md) - Artillery integration details
 - [DIAGNOSIS_AND_SOLUTION.md](DIAGNOSIS_AND_SOLUTION.md) - k6 troubleshooting
 - [README.md](README.md) - General usage and architecture
-- [Blog: CI/CD Integration](../blog/advanced/art5.md) - Automating validation tests
-- [Blog: Performance Optimization](../blog/advanced/art8.md) - Analyzing test results
+- [Blog: CI/CD Integration](https://destbreso.com/blog/load-tests-in-ci-cd) - Automating validation tests
+- [Blog: Performance Optimization](https://destbreso.com/blog/from-load-test-metrics-to-performance-fixes) - Analyzing test results
 
 **Last Validated:** January 24, 2026  
 **Test Duration:** ~2 minutes (Artillery + k6)  

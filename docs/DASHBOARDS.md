@@ -552,8 +552,8 @@ docker-compose logs grafana | grep -i provision
 
 - **[USAGE.md](USAGE.md)** - Run tests to generate metrics
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Fix dashboard issues
-- **[Blog: Metrics Deep Dive](../blog/advanced/art4.md)** - Understanding metrics and monitoring
-- **[Blog: Dashboard Customization](../blog/advanced/art10-dashboard-customization.md)** - Custom metrics and advanced panels
+- **[Blog: Metrics Deep Dive](https://destbreso.com/blog/reading-load-test-metrics)** - Understanding metrics and monitoring
+- **[Blog: Dashboard Customization](https://destbreso.com/blog/load-testing-lab-custom-metrics-and-dashboards)** - Custom metrics and advanced panels
 - **[Grafana Docs](https://grafana.com/docs/)** - Official documentation
 - **[Flux Language](https://docs.influxdata.com/flux/)** - Query language guide
 

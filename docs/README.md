@@ -19,7 +19,6 @@
 - 13 articles (3 basic + 10 advanced)
 - 100% reproducible examples
 - Beginner to expert progression
-- Also available locally in [`/blog`](../blog/README.md)
 
 ---
 
@@ -78,7 +77,7 @@ And when you want to test a new endpoint, try a new dashboard, or onboard a team
 - ✅ **Ready-to-run scenarios** – Dozens of k6 and Artillery examples
 - ✅ **6 pre-configured dashboards** – Tested and working out of the box
 - ✅ **CLI for ergonomics** – `ltlab start` instead of docker-compose flags
-- ✅ **13-article course** – From basics to advanced, everything documented
+- ✅ **A course on destbreso.com**: three series, from first test to custom dashboards
 - ✅ **One lab, many projects** – Use with any project without per-project setup
 - ✅ **External scenarios & dashboards** – Keep tests in your project repos
 - ✅ Precompiled k6 with xk6-influxdb (no Go toolchain needed)
@@ -200,7 +199,7 @@ The lab is **infrastructure**. Your project is the **source of truth** for its t
 ### Additional Resources
 
 - **[CLI Documentation](../cli/README.md)** - Complete CLI command reference
-- **[Blog Series](../blog/README.md)** - 13-article course on load testing
+- **[Course on destbreso.com](https://destbreso.com/blog/series/load-testing-lab-guide)** - Three series on load testing with the lab
 - **[Toy API Reference](../toy-api/README.md)** - Built-in test API documentation
 - **[Production Mode Guide](PRODUCTION_MODE.md)** - High-scale testing configuration
 - **[Artillery Integration Guide](ARTILLERY_INFLUXDB_GUIDE.md)** - Detailed Artillery setup
@@ -349,7 +348,7 @@ MIT License - See [LICENSE](../LICENSE) for details
 - **Issues**: [GitHub Issues](https://github.com/destbreso/load-testing-lab/issues)
 - **Course**: [destbreso.com](https://destbreso.com)
 - **Documentation**: This docs folder
-- **Blog**: [Article series](../blog/README.md)
+- **Course**: [Three series on destbreso.com](https://destbreso.com/blog/series/load-testing-lab-guide)
 
 ---
 

@@ -489,8 +489,8 @@ See [DIAGNOSIS_AND_SOLUTION.md](DIAGNOSIS_AND_SOLUTION.md) for detailed troubles
 - [DIAGNOSIS_AND_SOLUTION.md](DIAGNOSIS_AND_SOLUTION.md) - Troubleshooting guide
 - [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute
 - [cli/README.md](cli/README.md) - CLI documentation
-- [Blog: CI/CD Integration](../blog/advanced/art5.md) - Automating load tests
-- [Blog: Performance Optimization](../blog/advanced/art8.md) - Production optimization insights
+- [Blog: CI/CD Integration](https://destbreso.com/blog/load-tests-in-ci-cd) - Automating load tests
+- [Blog: Performance Optimization](https://destbreso.com/blog/from-load-test-metrics-to-performance-fixes) - Production optimization insights
 
 ---
 

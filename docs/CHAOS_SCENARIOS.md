@@ -324,7 +324,7 @@ All chaos scenarios target these local endpoints:
 - 🏗️ [Setup](./SETUP.md) - Installation and configuration
 - 🚀 [Testing Guide](./TESTING_GUIDE.md) - Complete testing workflows
 - 🎓 [Chaos Testing Guide](./CHAOS_TESTING_GUIDE.md) - In-depth chaos engineering
-- 📝 [Blog: Advanced Traffic Patterns and Chaos Testing](../blog/advanced/art7.md) - Article with practical examples and best practices
+- 📝 [Blog: Advanced Traffic Patterns and Chaos Testing](https://destbreso.com/blog/chaos-testing-under-load) - Article with practical examples and best practices
 
 ---
 

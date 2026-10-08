@@ -1086,7 +1086,7 @@ chmod +x run-regression.sh
 ## Additional Resources
 
 - **Main Documentation:** [../README.md](../README.md)
-- **Blog Series:** [https://destbreso.com](https://destbreso.com)
+- **Course:** [https://destbreso.com/blog/series/load-testing-lab-guide](https://destbreso.com/blog/series/load-testing-lab-guide)
 - **Grafana Dashboards:** http://localhost:3000 (when lab is running)
 - **k6 Documentation:** https://k6.io/docs/
 - **Artillery Documentation:** https://www.artillery.io/docs

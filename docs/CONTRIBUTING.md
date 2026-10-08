@@ -327,7 +327,6 @@ load-testing-lab/
 │   ├── commands/            # Command implementations
 │   └── blueprints/          # Scenario blueprints
 ├── scripts/                 # Utilities and helpers
-├── blog/                    # Tutorial articles
 │   ├── basic/
 │   └── advanced/
 └── docs/                    # Documentation
@@ -515,9 +514,9 @@ Every contribution, no matter how small, is valued and appreciated. Together we'
 
 ## Additional Resources
 
-- [Blog: Introduction to Load Testing Lab](../blog/basic/art1.md) - Project philosophy and goals
-- [Blog: Architecture Overview](../blog/advanced/art1.md) - Strategic approaches to performance engineering
-- [Blog Series Overview](../blog/README.md) - Complete tutorial series
+- [Blog: Introduction to Load Testing Lab](https://destbreso.com/blog/why-a-dedicated-load-testing-lab) - Project philosophy and goals
+- [Blog: Architecture Overview](https://destbreso.com/blog/performance-engineering-validation-capacity-resilience) - Strategic approaches to performance engineering
+- [Blog Series Overview](https://destbreso.com/blog/series/load-testing-lab-guide) - Complete tutorial series
 
 ---
 

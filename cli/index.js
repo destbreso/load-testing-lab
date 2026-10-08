@@ -76,7 +76,7 @@ ${chalk.bold("Common Workflows:")}
 ${chalk.bold("Resources:")}
   Documentation: ${chalk.cyan("./README.md")}
   CLI Guide:     ${chalk.cyan("./cli/README.md")}
-  Blog Series:   ${chalk.cyan("https://destbreso.com")}
+  Course:        ${chalk.cyan("https://destbreso.com/blog/series/load-testing-lab-guide")}
 
 ${chalk.bold("Quick Links:")}  
   Grafana:       ${chalk.cyan(`http://localhost:${process.env.GRAFANA_PORT || 3000}`)}

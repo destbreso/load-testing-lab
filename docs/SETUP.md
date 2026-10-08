@@ -438,7 +438,7 @@ docker-compose run --rm k6 run /k6/scenarios/toy-fast.js
 - **[USAGE.md](USAGE.md)** - Learn how to run tests
 - **[DASHBOARDS.md](DASHBOARDS.md)** - Explore Grafana dashboards
 - **[CLI Documentation](../cli/README.md)** - Master the CLI commands
-- **[Blog Series](../blog/README.md)** - Follow the complete course
+- **[Blog Series](https://destbreso.com/blog/series/load-testing-lab-guide)** - Follow the complete course
 
 ---
 
@@ -448,8 +448,8 @@ If you encounter issues during setup, see:
 
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common problems and solutions
 - **[DIAGNOSIS_AND_SOLUTION.md](DIAGNOSIS_AND_SOLUTION.md)** - Technical deep dive
-- **[Blog: Getting Started Guide](../blog/basic/art2.md)** - Step-by-step tutorial with examples
-- **[Blog: Architecture Overview](../blog/advanced/art1.md)** - Strategic approaches to setup
+- **[Blog: Getting Started Guide](https://destbreso.com/blog/load-testing-lab-getting-started)** - Step-by-step tutorial with examples
+- **[Blog: Architecture Overview](https://destbreso.com/blog/performance-engineering-validation-capacity-resilience)** - Strategic approaches to setup
 
 ---
 
