@@ -89,7 +89,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: -5m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_reqs\")\n  |> group()\n  |> count()",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: -5m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_reqs\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group()\n  |> count()",
           "refId": "A"
         }
       ],
