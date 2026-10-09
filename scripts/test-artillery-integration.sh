@@ -4,6 +4,14 @@
 # Runs a short test and verifies that metrics reach InfluxDB
 
 set -e
+cd "$(dirname "$0")/.."
+
+# The lab's settings (token, organization, bucket, ports)
+set -a
+[ -f .env ] && . ./.env
+set +a
+INFLUX_URL="http://localhost:${INFLUXDB_PORT_EXPORT:-8086}"
+BUCKET="${INFLUXDB_BUCKET:-loadtests}"
 
 echo "🧪 Testing Artillery → Telegraf → InfluxDB Integration"
 echo ""
@@ -21,8 +29,7 @@ if docker ps | grep -q telegraf; then
 else
     echo -e "${RED}✗ Telegraf is not running${NC}"
     echo "   Starting Telegraf..."
-    docker-compose up -d telegraf
-    sleep 3
+    docker compose up -d --wait telegraf
 fi
 echo ""
 
@@ -32,7 +39,7 @@ if docker ps | grep -q influxdb; then
     echo -e "${GREEN}✓ InfluxDB is running${NC}"
 else
     echo -e "${RED}✗ InfluxDB is not running${NC}"
-    echo "   Start InfluxDB with: docker-compose up -d influxdb"
+    echo "   Start InfluxDB with: docker compose up -d influxdb"
     exit 1
 fi
 echo ""
@@ -40,7 +47,7 @@ echo ""
 # 3. Run short Artillery test
 echo "3️⃣  Running Artillery test (30 seconds)..."
 echo -e "${YELLOW}   This will generate traffic to the Toy API${NC}"
-docker-compose run --rm artillery run /artillery/scenarios/toy-fast.yml &
+docker compose run --rm artillery run /artillery/scenarios/toy-fast.yml &
 ARTILLERY_PID=$!
 
 # Wait a bit for Artillery to generate metrics
@@ -51,18 +58,13 @@ echo ""
 echo "4️⃣  Checking for Artillery metrics in InfluxDB..."
 sleep 10  # Wait for Telegraf to flush metrics
 
-# Load environment variables
-if [ -f .env ]; then
-    export $(cat .env | grep -v '^#' | xargs)
-fi
-
 # Query to search for artillery metrics
-QUERY='from(bucket: "loadtests")
+QUERY='from(bucket: "'"${BUCKET}"'")
   |> range(start: -5m)
   |> filter(fn: (r) => r["_measurement"] =~ /^artillery/)
   |> limit(n: 5)'
 
-RESULT=$(curl -s "http://localhost:8086/api/v2/query?org=${INFLUXDB_ORG}" \
+RESULT=$(curl -s "${INFLUX_URL}/api/v2/query?org=${INFLUXDB_ORG}" \
   -H "Authorization: Token ${INFLUXDB_TOKEN}" \
   -H "Content-Type: application/vnd.flux" \
   -d "${QUERY}")
@@ -87,6 +89,6 @@ echo ""
 echo "5️⃣  Integration test complete!"
 echo ""
 echo "📊 View metrics in Grafana:"
-echo "   http://localhost:3000/d/artillery-telegraf"
+echo "   http://localhost:${GRAFANA_PORT:-3000}/d/artillery-telegraf"
 echo ""
 echo -e "${GREEN}✓ Artillery integration is working${NC}"

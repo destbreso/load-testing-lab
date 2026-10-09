@@ -1,6 +1,6 @@
-import { spawn } from "child_process";
 import inquirer from "inquirer";
 import chalk from "chalk";
+import { compose, composeDisplay, exitCodeOf } from "../lib/lab.js";
 
 // Generate random confirmation code
 function generateConfirmationCode() {
@@ -57,22 +57,18 @@ export default async function purgeCmd() {
   // Execute purge
   console.log(chalk.red(`\n▶ Purging all lab data...`));
   
-  const cmd = "docker-compose";
-  const args = ["down", "-v", "--remove-orphans"];
-  
-  console.log(chalk.dim(`  Command: ${cmd} ${args.join(" ")}\n`));
+  const args = ["--profile", "runners", "down", "-v", "--remove-orphans"];
 
-  const child = spawn(cmd, args, { stdio: "inherit", shell: true });
+  console.log(chalk.dim(`  Command: ${await composeDisplay(args)}\n`));
 
-  child.on("exit", (code) => {
-    if (code === 0) {
-      console.log(chalk.green(`\n✓ Lab purged successfully!`));
-      console.log(chalk.cyan(`\nAll containers, volumes, and data have been removed.`));
-      console.log(chalk.dim(`\nTo start fresh:`));
-      console.log(chalk.green(`  ltlab start`));
-    } else {
-      console.log(chalk.red(`\n✗ Purge failed with exit code ${code}`));
-    }
-    process.exit(code);
-  });
+  try {
+    await compose(args);
+    console.log(chalk.green(`\n✓ Lab purged successfully!`));
+    console.log(chalk.cyan(`\nAll containers, volumes, and data have been removed.`));
+    console.log(chalk.dim(`\nTo start fresh:`));
+    console.log(chalk.green(`  ltlab start`));
+  } catch (err) {
+    console.log(chalk.red(`\n✗ Purge failed with exit code ${exitCodeOf(err)}`));
+    process.exitCode = exitCodeOf(err);
+  }
 }

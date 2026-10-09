@@ -5,9 +5,10 @@ export default async function showMetrics() {
   try {
     console.log(chalk.cyan.bold("\n📊 InfluxDB Metrics Overview\n"));
 
-    const influxUrl = process.env.INFLUXDB_URL || "http://localhost:8086";
-    const token = process.env.INFLUXDB_TOKEN || "admin123";
-    const org = process.env.INFLUXDB_ORG || "ltl";
+    const influxUrl =
+      process.env.INFLUXDB_URL || `http://localhost:${process.env.INFLUXDB_PORT_EXPORT || 8086}`;
+    const token = process.env.INFLUXDB_TOKEN || "";
+    const org = process.env.INFLUXDB_ORG || "myorg";
 
     // Check if InfluxDB is running
     try {
@@ -57,7 +58,7 @@ export default async function showMetrics() {
     console.log(chalk.white("🔗 Connection Info:\n"));
     console.log(chalk.dim(`  URL:      ${influxUrl}`));
     console.log(chalk.dim(`  Org:      ${org}`));
-    console.log(chalk.dim(`  Token:    ${token.substring(0, 10)}...`));
+    console.log(chalk.dim(`  Token:    ${token ? token.substring(0, 6) + "..." : "(none: run ltlab configure)"}`));
     console.log();
 
     // Show Grafana link
@@ -79,6 +80,6 @@ export default async function showMetrics() {
     console.log(chalk.yellow("\nTroubleshooting:"));
     console.log(chalk.white("  1. Ensure the lab is running: ltlab start"));
     console.log(chalk.white("  2. Check .env configuration: ltlab info"));
-    console.log(chalk.white("  3. Verify InfluxDB is healthy: docker-compose ps\n"));
+    console.log(chalk.white("  3. Check the services: ltlab info\n"));
   }
 }

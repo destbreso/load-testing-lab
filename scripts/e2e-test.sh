@@ -4,6 +4,14 @@
 # Usage: ./scripts/e2e-test.sh
 
 set -e
+cd "$(dirname "$0")/.."
+
+# The lab's settings (token, organization, bucket, ports)
+set -a
+[ -f .env ] && . ./.env
+set +a
+INFLUX_URL="http://localhost:${INFLUXDB_PORT_EXPORT:-8086}"
+BUCKET="${INFLUXDB_BUCKET:-loadtests}"
 
 echo "🧪 Load Testing Lab - End-to-End Test"
 echo "======================================"
@@ -17,8 +25,7 @@ NC='\033[0m'
 
 # 1. Start services
 echo "1️⃣ Starting services..."
-docker-compose up -d influxdb telegraf grafana toy-api
-sleep 5
+docker compose up -d --wait influxdb telegraf grafana toy-api
 echo -e "${GREEN}✅ Services started${NC}"
 echo ""
 
@@ -51,7 +58,7 @@ echo ""
 
 # 3. Run Artillery test
 echo "3️⃣ Running Artillery test (30s)..."
-docker-compose run --rm artillery run /artillery/scenarios/toy-fast.yml > /tmp/artillery.log 2>&1
+docker compose run --rm artillery run /artillery/scenarios/toy-fast.yml > /tmp/artillery.log 2>&1
 ARTILLERY_EXIT=$?
 
 if [ $ARTILLERY_EXIT -eq 0 ]; then
@@ -66,11 +73,10 @@ echo ""
 # 4. Verify Artillery metrics
 echo "4️⃣ Verifying Artillery metrics in InfluxDB..."
 sleep 10  # Wait for Telegraf flush
-export $(cat .env | grep -v '^#' | xargs)
-ARTILLERY_RESULT=$(curl -s "http://localhost:8086/api/v2/query?org=${INFLUXDB_ORG}" \
+ARTILLERY_RESULT=$(curl -s "${INFLUX_URL}/api/v2/query?org=${INFLUXDB_ORG}" \
   -H "Authorization: Token ${INFLUXDB_TOKEN}" \
   -H "Content-Type: application/vnd.flux" \
-  -d 'from(bucket: "loadtests") |> range(start: -5m) |> filter(fn: (r) => r["_measurement"] =~ /^artillery/) |> limit(n: 1)')
+  -d 'from(bucket: "'"${BUCKET}"'") |> range(start: -5m) |> filter(fn: (r) => r["_measurement"] =~ /^artillery/) |> limit(n: 1)')
 
 if echo "$ARTILLERY_RESULT" | grep -q "_value"; then
     echo -e "${GREEN}✅ Artillery metrics found in InfluxDB${NC}"
@@ -89,7 +95,7 @@ echo ""
 
 # 5. Run k6 test
 echo "5️⃣ Running k6 test (50s)..."
-docker-compose run --rm k6 run /k6/scenarios/toy-mixed.js > /tmp/k6.log 2>&1
+docker compose run --rm k6 run /k6/scenarios/toy-mixed.js > /tmp/k6.log 2>&1
 K6_EXIT=$?
 
 if [ $K6_EXIT -eq 0 ]; then
@@ -103,10 +109,10 @@ echo ""
 
 # 6. Verify k6 metrics
 echo "6️⃣ Verifying k6 metrics in InfluxDB..."
-K6_RESULT=$(curl -s "http://localhost:8086/api/v2/query?org=${INFLUXDB_ORG}" \
+K6_RESULT=$(curl -s "${INFLUX_URL}/api/v2/query?org=${INFLUXDB_ORG}" \
   -H "Authorization: Token ${INFLUXDB_TOKEN}" \
   -H "Content-Type: application/vnd.flux" \
-  -d 'from(bucket: "loadtests") |> range(start: -5m) |> filter(fn: (r) => r["_measurement"] == "http_req_duration") |> limit(n: 1)')
+  -d 'from(bucket: "'"${BUCKET}"'") |> range(start: -5m) |> filter(fn: (r) => r["_measurement"] == "http_req_duration") |> limit(n: 1)')
 
 if echo "$K6_RESULT" | grep -q "_value"; then
     echo -e "${GREEN}✅ k6 metrics found in InfluxDB${NC}"
@@ -138,11 +144,9 @@ echo ""
 echo "======================================"
 echo -e "${GREEN}✅ End-to-End Test PASSED${NC}"
 echo ""
-echo "📊 Test Results:"
-echo "   Artillery: 1500 requests @ 50 req/sec"
-echo "   k6: ~1700 requests @ 35 req/sec"
-echo "   InfluxDB: Both tools writing successfully"
-echo "   Grafana: Dashboards accessible"
+echo "📊 Verified:"
+echo "   Artillery and k6 runs completed, and both wrote metrics to InfluxDB"
+echo "   Grafana answered its health check"
 echo ""
 echo "🌐 View dashboards:"
 echo "   Artillery: http://localhost:${GRAFANA_PORT:-3000}/d/artillery-telegraf"

@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
-import { spawn } from "child_process";
 import inquirer from "inquirer";
 import chalk from "chalk";
+import { compose, composeDisplay, exitCodeOf } from "../lib/lab.js";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
@@ -45,7 +45,7 @@ export default async function runCmd(options) {
     );
     console.log(
       chalk.yellow(
-        `\nTip: Generate a scenario first with: ${chalk.green(`npm run cli -- generate -e ${engine} -n my-test`)}`,
+        `\nTip: Generate a scenario first with: ${chalk.green(`ltlab generate -e ${engine} -n my-test`)}`,
       ),
     );
     process.exit(1);
@@ -60,7 +60,7 @@ export default async function runCmd(options) {
     console.error(chalk.red(`\nNo scenarios found for ${engine}`));
     console.log(
       chalk.yellow(
-        `\nTip: Generate a scenario first with: ${chalk.green(`npm run cli -- generate -e ${engine} -n my-test`)}`,
+        `\nTip: Generate a scenario first with: ${chalk.green(`ltlab generate -e ${engine} -n my-test`)}`,
       ),
     );
     process.exit(1);
@@ -86,34 +86,22 @@ export default async function runCmd(options) {
     process.exit(1);
   }
 
-  // Build docker-compose command
-  const cmd = "docker-compose";
-  const args = [
-    "run",
-    "--rm",
-    engine,
-    "run",
-    `/${engine}/scenarios/${scenario}`,
-  ];
+  const args = ["run", "--rm", engine, "run", `/${engine}/scenarios/${scenario}`];
 
-  console.log(
-    chalk.blue(`\n▶ Running ${engine} scenario: ${chalk.bold(scenario)}`),
-  );
-  console.log(chalk.dim(`  Command: ${cmd} ${args.join(" ")}\n`));
+  console.log(chalk.blue(`\n▶ Running ${engine} scenario: ${chalk.bold(scenario)}`));
+  console.log(chalk.dim(`  Command: ${await composeDisplay(args)}\n`));
 
-  const child = spawn(cmd, args, { stdio: "inherit", shell: true });
-  child.on("exit", (code) => {
-    if (code === 0) {
-      console.log(chalk.green(`\n✓ Test completed successfully!`));
-      console.log(
-        chalk.cyan(
-          `  View results in Grafana: ${chalk.bold(`http://localhost:${process.env.GRAFANA_PORT || 3000}`)}`,
-        ),
-      );
-    } else if (code !== 130) {
-      // 130 es Ctrl+C
-      console.log(chalk.red(`\n✗ Test failed with exit code ${code}`));
-    }
-    process.exit(code);
-  });
+  try {
+    await compose(args);
+    console.log(chalk.green(`\n✓ Test completed successfully!`));
+    console.log(
+      chalk.cyan(
+        `  View results in Grafana: ${chalk.bold(`http://localhost:${process.env.GRAFANA_PORT || 3000}`)}`,
+      ),
+    );
+  } catch (err) {
+    const code = exitCodeOf(err);
+    if (code !== 130) console.log(chalk.red(`\n✗ Test failed with exit code ${code}`));
+    process.exitCode = code;
+  }
 }

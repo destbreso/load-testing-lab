@@ -1,6 +1,6 @@
-import { execa } from "execa";
 import inquirer from "inquirer";
 import chalk from "chalk";
+import { compose, exitCodeOf } from "../lib/lab.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "../..");
+const TOY_API_URL = "http://toy-api:5000";
 
 export default async function chaosTest(options = {}) {
   try {
@@ -91,7 +92,7 @@ export default async function chaosTest(options = {}) {
       );
       console.log(
         chalk.yellow(
-          `\nTip: Generate a scenario first with: ${chalk.green(`npm run cli -- generate -e ${engine} -n my-test`)}`,
+          `\nTip: Generate a scenario first with: ${chalk.green(`ltlab generate -e ${engine} -n my-test`)}`,
         ),
       );
       process.exit(1);
@@ -112,7 +113,7 @@ export default async function chaosTest(options = {}) {
     console.log(chalk.white(`  File:     ${scenarioFile}`));
     console.log(
       chalk.white(
-        `  Target:   ${process.env.TARGET_API_URL || "http://toy-api:5000"}`,
+        `  Target:   ${TOY_API_URL} (chaos scenarios always run against the toy API)`,
       ),
     );
 
@@ -145,26 +146,11 @@ export default async function chaosTest(options = {}) {
 
     console.log(chalk.cyan(`\n🚀 Starting chaos test with ${engine}...\n`));
 
-    // Execute test
-    if (engine === "k6") {
-      await execa(
-        "docker-compose",
-        ["run", "--rm", "k6", "run", `/k6/scenarios/${scenarioFile}`],
-        { stdio: "inherit" },
-      );
-    } else {
-      await execa(
-        "docker-compose",
-        [
-          "run",
-          "--rm",
-          "artillery",
-          "run",
-          `/artillery/scenarios/${scenarioFile}`,
-        ],
-        { stdio: "inherit" },
-      );
-    }
+    // Execute test. The chaos scenarios exercise the toy API's own failure
+    // routes, so they target it whatever TARGET_API_URL says.
+    const containerPath =
+      engine === "k6" ? `/k6/scenarios/${scenarioFile}` : `/artillery/scenarios/${scenarioFile}`;
+    await compose(["run", "--rm", "-e", `TARGET_API_URL=${TOY_API_URL}`, engine, "run", containerPath]);
 
     console.log(chalk.green("\n✅ Chaos test completed!\n"));
     console.log(chalk.cyan("📊 View results in Grafana:"));
@@ -180,7 +166,7 @@ export default async function chaosTest(options = {}) {
       chalk.white("   • Difference between success vs failed requests\n"),
     );
   } catch (err) {
-    console.error(chalk.red("\n❌ Chaos test failed:"), err.message);
-    process.exit(1);
+    console.error(chalk.red("\n❌ Chaos test failed:"), err.shortMessage || err.message);
+    process.exitCode = exitCodeOf(err);
   }
 }

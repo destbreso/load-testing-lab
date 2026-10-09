@@ -12,7 +12,6 @@ export default async function dashboardCmd(action, source, options) {
 
   switch (action) {
     case "link":
-    case "copy":
       await linkDashboards(source, grafanaDashboardsDir);
       break;
     case "list":
@@ -76,26 +75,17 @@ async function linkDashboards(sourceDir, targetDir) {
     console.log(chalk.dim(`   Copied: ${file}`));
   }
 
-  // Store source path for sync command
-  const metaFile = path.join(customDir, ".source");
-  fs.writeFileSync(metaFile, resolvedSource);
-
   console.log(
     chalk.green(`\n✅ ${files.length} dashboard(s) linked successfully!`),
   );
   console.log(chalk.dim(`   Source: ${resolvedSource}`));
   console.log(chalk.dim(`   Target: ${customDir}`));
   console.log("");
-  console.log(chalk.yellow("Note: Restart Grafana to load new dashboards:"));
-  console.log(chalk.white("   ltlab restart -s grafana"));
-  console.log("");
+  console.log(chalk.dim("Grafana picks them up within 10 seconds, in a folder named 'custom'."));
   console.log(
     chalk.dim(
       "To sync changes from source, run: ltlab dashboard link <dir> again",
     ),
-  );
-  console.log(
-    chalk.dim("Dashboards will appear in Grafana under 'custom' folder"),
   );
 }
 
@@ -146,7 +136,5 @@ async function unlinkDashboards(dashboardsDir) {
   console.log(
     chalk.green(`✅ Custom dashboards removed (${files.length} dashboard(s))`),
   );
-  console.log("");
-  console.log(chalk.yellow("Note: Restart Grafana to apply changes:"));
-  console.log(chalk.white("   ltlab restart -s grafana"));
+  console.log(chalk.dim("Grafana removes them within 10 seconds."));
 }

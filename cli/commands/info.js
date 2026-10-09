@@ -1,16 +1,13 @@
 import chalk from "chalk";
-import { execa } from "execa";
-import fs from "fs";
-import dotenv from "dotenv";
+import { compose, readLabEnv, ENV_PATH } from "../lib/lab.js";
 
 export default async function showInfo() {
   console.log(chalk.cyan.bold("\n📊 Load Testing Lab - Environment Info\n"));
 
-  // Parse .env file
-  if (fs.existsSync(".env")) {
-    console.log(chalk.green("✓ .env file found\n"));
-
-    const envConfig = dotenv.parse(fs.readFileSync(".env", "utf8"));
+  // Parse the lab's .env file
+  const envConfig = readLabEnv();
+  if (envConfig) {
+    console.log(chalk.green(`✓ .env file found (${ENV_PATH})\n`));
 
     // Display environment variables in organized sections
     console.log(chalk.white.bold("🔧 Configuration:\n"));
@@ -29,7 +26,7 @@ export default async function showInfo() {
         console.log(chalk.dim(`     Org:    ${envConfig.INFLUXDB_ORG}`));
       }
       if (envConfig.INFLUXDB_TOKEN) {
-        const maskedToken = envConfig.INFLUXDB_TOKEN.substring(0, 10) + "...";
+        const maskedToken = envConfig.INFLUXDB_TOKEN.substring(0, 6) + "...";
         console.log(chalk.dim(`     Token:  ${maskedToken}`));
       }
       if (envConfig.INFLUXDB_BUCKET) {
@@ -125,111 +122,40 @@ export default async function showInfo() {
   console.log(chalk.white.bold("🐳 Docker Services Status:\n"));
 
   try {
-    const { stdout } = await execa("docker-compose", [
-      "ps",
-      "--format",
-      "json",
-    ]);
+    const { stdout } = await compose(["ps", "--format", "json"], { stdio: "pipe" });
+    const text = stdout.trim();
+    // Compose prints one JSON object per line (or, in older v2 releases, one array)
+    const services = !text ? [] : text.startsWith("[") ? JSON.parse(text) : text.split("\n").map((line) => JSON.parse(line));
 
-    if (stdout.trim()) {
-      const services = stdout
-        .trim()
-        .split("\n")
-        .map((line) => JSON.parse(line));
-
-      if (services.length === 0) {
-        console.log(chalk.yellow("  ⚠️  No services running\n"));
-        console.log(chalk.dim("     Start the lab with: ltlab start\n"));
-      } else {
-        services.forEach((service) => {
-          const name = service.Service || service.Name;
-          const state = service.State;
-          const status = service.Status;
-
-          let statusIcon = "●";
-          let statusColor = chalk.gray;
-
-          if (state === "running") {
-            statusIcon = "●";
-            statusColor = chalk.green;
-          } else if (state === "exited") {
-            statusIcon = "○";
-            statusColor = chalk.red;
-          } else {
-            statusIcon = "◐";
-            statusColor = chalk.yellow;
-          }
-
-          console.log(statusColor(`  ${statusIcon} ${name}`));
-          console.log(chalk.dim(`     State:  ${state}`));
-          if (status) {
-            console.log(chalk.dim(`     Status: ${status}`));
-          }
-          console.log();
-        });
-      }
-    } else {
+    if (services.length === 0) {
       console.log(chalk.yellow("  ⚠️  No services running\n"));
       console.log(chalk.dim("     Start the lab with: ltlab start\n"));
+    } else {
+      services.forEach((service) => {
+        const name = service.Service || service.Name;
+        const state = service.State;
+        const health = service.Health;
+        const statusColor = state === "running" ? (health && health !== "healthy" ? chalk.yellow : chalk.green) : chalk.red;
+        console.log(statusColor(`  ● ${name}`));
+        console.log(chalk.dim(`     State:  ${state}${health ? ` (${health})` : ""}`));
+        if (service.Status) console.log(chalk.dim(`     Status: ${service.Status}`));
+        console.log();
+      });
     }
   } catch (err) {
-    // Fallback to simple ps if JSON format not available
-    console.log(chalk.dim("  Checking services...\n"));
-    try {
-      const { stdout } = await execa("docker-compose", ["ps"]);
-
-      if (stdout.includes("No containers found")) {
-        console.log(chalk.yellow("  ⚠️  No services running\n"));
-        console.log(chalk.dim("     Start the lab with: ltlab start\n"));
-      } else {
-        // Parse simple output
-        const lines = stdout
-          .split("\n")
-          .filter((line) => line.trim() && !line.startsWith("NAME"));
-
-        if (lines.length === 0) {
-          console.log(chalk.yellow("  ⚠️  No services running\n"));
-          console.log(chalk.dim("     Start the lab with: ltlab start\n"));
-        } else {
-          lines.forEach((line) => {
-            const parts = line.trim().split(/\s+/);
-            if (parts.length > 0) {
-              const name = parts[0];
-              const status = parts.slice(1).join(" ");
-
-              let statusIcon = "●";
-              let statusColor = chalk.gray;
-
-              if (status.includes("Up") || status.includes("running")) {
-                statusIcon = "●";
-                statusColor = chalk.green;
-              } else if (status.includes("Exit")) {
-                statusIcon = "○";
-                statusColor = chalk.red;
-              }
-
-              console.log(statusColor(`  ${statusIcon} ${name}`));
-              console.log(chalk.dim(`     ${status}`));
-              console.log();
-            }
-          });
-        }
-      }
-    } catch (innerErr) {
-      console.log(chalk.red("  ❌ Failed to get services status\n"));
-      console.log(chalk.yellow("     Possible issues:"));
-      console.log(chalk.dim("     • Docker is not running"));
-      console.log(chalk.dim("     • docker-compose is not installed"));
-      console.log(chalk.dim("     • Not in project directory\n"));
-    }
+    console.log(chalk.red("  ❌ Failed to get services status\n"));
+    console.log(chalk.yellow("     Possible issues:"));
+    console.log(chalk.dim("     • Docker is not running"));
+    console.log(chalk.dim(`     • ${err.shortMessage || err.message}\n`));
   }
 
   // Quick Links
   console.log(chalk.white.bold("🔗 Quick Links:\n"));
   const grafanaPort = process.env.GRAFANA_PORT || 3000;
-  const influxPort = process.env.INFLUXDB_PORT || 8086;
+  const influxPort = process.env.INFLUXDB_PORT_EXPORT || 8086;
+  const toyApiPort = process.env.TOY_API_PORT || 5000;
   console.log(chalk.cyan(`  • Grafana:  http://localhost:${grafanaPort}`));
   console.log(chalk.cyan(`  • InfluxDB: http://localhost:${influxPort}`));
-  console.log(chalk.cyan(`  • Toy API:  http://localhost:5000`));
+  console.log(chalk.cyan(`  • Toy API:  http://localhost:${toyApiPort}`));
   console.log();
 }

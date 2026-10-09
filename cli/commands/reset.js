@@ -13,7 +13,7 @@ const projectRoot = path.resolve(__dirname, "../..");
 export default async function resetMetrics() {
   console.log(chalk.yellow.bold("\n⚠️  Reset All Metrics\n"));
   console.log(chalk.white("This will delete all metrics data from InfluxDB."));
-  console.log(chalk.dim("Buckets: k6, artillery, and any other user buckets\n"));
+  console.log(chalk.dim("Every bucket except InfluxDB's own system buckets\n"));
 
   // Confirmation
   const { confirm } = await inquirer.prompt([

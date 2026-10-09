@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 
 import dotenv from "dotenv";
-dotenv.config();
+import { ENV_PATH } from "./lib/lab.js";
+
+// The lab's own .env, whatever directory the CLI is run from
+dotenv.config({ path: ENV_PATH, quiet: true });
 
 import { readFile } from "fs/promises";
 import { fileURLToPath } from "url";
@@ -20,7 +23,6 @@ import runK6 from "./commands/k6.js";
 import runArtillery from "./commands/artillery.js";
 import showInfo from "./commands/info.js";
 import configureEnv from "./commands/configure.js";
-import scaleWorkers from "./commands/scale.js";
 import chaosTest from "./commands/chaos.js";
 import showMetrics from "./commands/metrics.js";
 import runCmd from "./commands/run.js";
@@ -56,7 +58,7 @@ ${chalk.bold("Quick Start:")}
   ${chalk.yellow("3.")} Generate a scenario:    ${chalk.green("ltlab generate -e k6 -n my-test")}
   ${chalk.yellow("4.")} Run a test:             ${chalk.green("ltlab k6 -s my-test.js")}
   ${chalk.yellow("5.")} View dashboards:        ${chalk.green(`Open http://localhost:${process.env.GRAFANA_PORT || 3000}`)}
-  ${chalk.yellow("5.")} View InfluxDB UI:       ${chalk.green(`Open http://localhost:${process.env.INFLUXDB_PORT || 8086}`)}
+  ${chalk.yellow("6.")} View InfluxDB UI:       ${chalk.green(`Open http://localhost:${process.env.INFLUXDB_PORT_EXPORT || 8086}`)}
 
 ${chalk.bold("Common Workflows:")}
   ${chalk.dim("# Setup and configure")}
@@ -80,7 +82,7 @@ ${chalk.bold("Resources:")}
 
 ${chalk.bold("Quick Links:")}  
   Grafana:       ${chalk.cyan(`http://localhost:${process.env.GRAFANA_PORT || 3000}`)}
-  InfluxDB:      ${chalk.cyan(`http://localhost:${process.env.INFLUXDB_PORT || 8086}`)}
+  InfluxDB:      ${chalk.cyan(`http://localhost:${process.env.INFLUXDB_PORT_EXPORT || 8086}`)}
 
 ${chalk.bold("Copyright:")}
   MIT License
@@ -98,20 +100,19 @@ program
     "after",
     `
 ${chalk.bold("Description:")}
-  Starts all lab services using Docker Compose:
-  - InfluxDB v2 (metrics storage)
-  - Grafana (dashboards and visualization)
-  - Toy API (test target)
-  - k6 and Artillery runners
+  Builds the k6 and Artillery images (cached after the first time), starts
+  InfluxDB, Telegraf, Grafana and the toy API, and waits until each one is
+  ready. Needs a .env file: create it with "ltlab configure".
+  The k6 and Artillery containers start only when a test runs.
 
 ${chalk.bold("Examples:")}
   ${chalk.green("ltlab start")}                  ${chalk.dim("Start all services")}
   ${chalk.green("npm start")}                    ${chalk.dim("Alternative using npm script")}
 
 ${chalk.bold("After Starting:")}
-  - Grafana:  ${chalk.cyan("http://localhost:3000")} (default: admin/admin123)
-  - Toy API:  ${chalk.cyan("http://localhost:5000")}
-  - InfluxDB: ${chalk.cyan("http://localhost:8086")} (default: admin/admin123)
+  - Grafana:  ${chalk.cyan(`http://localhost:${process.env.GRAFANA_PORT || 3000}`)} (default: admin/admin123)
+  - Toy API:  ${chalk.cyan(`http://localhost:${process.env.TOY_API_PORT || 5000}`)}
+  - InfluxDB: ${chalk.cyan(`http://localhost:${process.env.INFLUXDB_PORT_EXPORT || 8086}`)} (default: admin/admin123)
 `,
   )
   .action(startLab);
@@ -140,19 +141,20 @@ program
     "after",
     `
 ${chalk.bold("Description:")}
-  Interactive wizard to create/update .env file with:
-  - Target API URL
-  - InfluxDB connection settings
-  - Grafana credentials
-  - Default test parameters
+  Interactive wizard that creates or updates the lab's .env, wherever
+  you run it from. It keeps values already there, and generates the
+  InfluxDB token on the first run: InfluxDB adopts that token when it
+  starts for the first time, and k6, Telegraf and Grafana read it too.
 
 ${chalk.bold("Examples:")}
   ${chalk.green("ltlab configure")}              ${chalk.dim("Run interactive configuration")}
 
 ${chalk.bold("Default Values:")}
-  TARGET_API_URL:     http://localhost:5000
-  INFLUXDB_URL:       http://influxdb:8086
-  INFLUXDB_TOKEN:     admin123
+  TARGET_API_URL:     http://toy-api:5000
+  INFLUXDB_ORG:       myorg
+  INFLUXDB_BUCKET:    loadtests
+  INFLUXDB_USER:      admin
+  INFLUXDB_PASSWORD:  admin123
   GRAFANA_USER:       admin
   GRAFANA_PASSWORD:   admin123
   CONCURRENCY:        50
@@ -187,7 +189,7 @@ ${chalk.bold("Available Blueprints:")}
   - ramp-up-down       ${chalk.dim("Gradual increase and decrease")}
   - spike-load         ${chalk.dim("Sudden traffic spikes")}
   - endpoint-thinktime ${chalk.dim("Realistic user behavior with delays")}
-  - variable-traffic   ${chalk.dim("Fluctuating load patterns")}
+  - variable-traffic   ${chalk.dim("Arrival rate that rises and falls")}
 
 ${chalk.bold("Examples:")}
   ${chalk.green("ltlab generate")}                           ${chalk.dim("Fully interactive mode")}
@@ -242,7 +244,7 @@ ${chalk.bold("Use Cases:")}
 
 program
   .command("restart")
-  .description("Restart services interactively")
+  .description("Restart services, recreating them with the current .env")
   .option(
     "-s, --service <service>",
     "Service to restart (influxdb, grafana, toy-api, telegraf, all)",
@@ -251,25 +253,25 @@ program
     "after",
     `
 ${chalk.bold("Description:")}
-  Restart individual services or all services at once.
-  Interactive mode lets you choose from available services.
+  Recreates one service or all of them, so they start with the current
+  .env, and waits until they are ready. Metrics stay on their volume.
 
 ${chalk.bold("Available Services:")}
   - influxdb  ${chalk.dim("Metrics database")}
-  - grafana   ${chalk.dim("Dashboards (auto-provisions on restart)")}
+  - grafana   ${chalk.dim("Dashboards")}
   - toy-api   ${chalk.dim("Test target API")}
   - telegraf  ${chalk.dim("Metrics collector for Artillery")}
   - all       ${chalk.dim("Restart all services")}
 
 ${chalk.bold("Examples:")}
   ${chalk.green("ltlab restart")}                ${chalk.dim("Interactive mode - choose service")}
-  ${chalk.green("ltlab restart -s grafana")}     ${chalk.dim("Restart Grafana (loads new dashboards)")}
+  ${chalk.green("ltlab restart -s telegraf")}    ${chalk.dim("Restart Telegraf")}
   ${chalk.green("ltlab restart -s all")}         ${chalk.dim("Restart all services")}
 
 ${chalk.bold("Use Cases:")}
-  - Refresh Grafana dashboards after updates
+  - Apply a change to .env
+  - Clear the toy API's in-memory job queue
   - Reset a specific service without stopping others
-  - Apply configuration changes
 `,
   )
   .action(restartCmd);
@@ -305,7 +307,8 @@ ${chalk.bold("Use Cases:")}
   - Applying Dockerfile changes
   - Fresh installation
 
-${chalk.yellow("Note:")} Rebuild can take several minutes. Services must be restarted after rebuild.
+${chalk.yellow("Note:")} Rebuild can take several minutes. The next test run uses the new
+k6 or Artillery image, and a running toy API is recreated from its new image.
 `,
   )
   .action(rebuildCmd);
@@ -351,18 +354,21 @@ program
   .description("Run k6 load tests")
   .option("-s, --scenario <file>", "Scenario file to run", "toy-fast.js")
   .option("-p, --project <dir>", "Mount entire project directory (for scenarios with helpers/data)")
+  .option("-e, --env <vars...>", "Extra environment variables: KEY=value, or KEY to take the value from your shell")
   .addHelpText(
     "after",
     `
 ${chalk.bold("Description:")}
   Executes a k6 test scenario in a Docker container.
   Results are sent to InfluxDB and visible in Grafana.
+  Exits with k6's exit code: 99 when a threshold fails.
 
 ${chalk.bold("Examples:")}
   ${chalk.green("ltlab k6 -s my-test.js")}                        ${chalk.dim("Run specific k6 scenario")}
   ${chalk.green("ltlab k6 -s ./tests/api-test.js")}               ${chalk.dim("Run local file (auto-detected)")}
   ${chalk.green("ltlab k6 -p ./my-project -s main.js")}           ${chalk.dim("Mount project dir with helpers")}
   ${chalk.green("ltlab k6 -p ~/projects/api/tests -s flow.js")}   ${chalk.dim("External project with imports")}
+  ${chalk.green("ltlab k6 -s ./tests/api-test.js -e API_TOKEN")}   ${chalk.dim("Pass API_TOKEN from your shell")}
 
 ${chalk.bold("Project Mode (-p):")}
   Use when your scenario imports other files (helpers, data, etc.)
@@ -391,12 +397,14 @@ program
     "toy-fast.yml",
   )
   .option("-p, --project <dir>", "Mount entire project directory (for scenarios with data files)")
+  .option("-e, --env <vars...>", "Extra environment variables: KEY=value, or KEY to take the value from your shell")
   .addHelpText(
     "after",
     `
 ${chalk.bold("Description:")}
   Executes an Artillery test scenario in a Docker container.
   Metrics are collected via Telegraf and stored in InfluxDB.
+  Exits with Artillery's exit code.
 
 ${chalk.bold("Examples:")}
   ${chalk.green("ltlab artillery -s my-test.yml")}              ${chalk.dim("Run specific Artillery scenario")}
@@ -433,31 +441,6 @@ ${chalk.bold("Examples:")}
   )
   .action(runCmd);
 
-// Extended commands (recipes)
-program
-  .command("scale")
-  .description("Scale k6 or Artillery workers")
-  .option("-t, --tool <name>", "k6 or artillery", "k6")
-  .option("-n, --number <count>", "Number of instances", "2")
-  .addHelpText(
-    "after",
-    `
-${chalk.bold("Description:")}
-  Scales up/down the number of test runner containers.
-  Useful for distributed load generation.
-
-${chalk.bold("Examples:")}
-  ${chalk.green("ltlab scale -t k6 -n 3")}       ${chalk.dim("Run 3 k6 instances")}
-  ${chalk.green("ltlab scale -t artillery -n 2")} ${chalk.dim("Run 2 Artillery instances")}
-
-${chalk.bold("Use Cases:")}
-  - Generating higher load from multiple sources
-  - Distributed testing
-  - Simulating different geographic regions
-`,
-  )
-  .action(scaleWorkers);
-
 program
   .command("chaos")
   .description("🌪️  Run chaos engineering scenarios against toy-api")
@@ -466,7 +449,8 @@ program
     "after",
     `
 ${chalk.bold("Description:")}
-  Runs chaos engineering tests against the toy-api with realistic failure patterns.
+  Runs chaos engineering tests against the toy API with realistic failure patterns.
+  They always target the toy API, whatever TARGET_API_URL says.
   ${chalk.green("Perfect for:")} Tutorials, demos, dashboard testing, and learning load testing!
   ${chalk.yellow("No external APIs needed")} - everything runs locally with toy-api.
 
@@ -511,7 +495,7 @@ ${chalk.bold("Examples:")}
   ${chalk.green("ltlab metrics")}                ${chalk.dim("Show metrics info")}
 
 ${chalk.bold("Better Alternative:")}
-  Open Grafana: ${chalk.cyan("http://localhost:3000")}
+  Open Grafana: ${chalk.cyan(`http://localhost:${process.env.GRAFANA_PORT || 3000}`)}
 `,
   )
   .action(showMetrics);
@@ -524,26 +508,23 @@ program
     "after",
     `
 ${chalk.bold("Description:")}
-  Link or copy external Grafana dashboards to the lab.
-  Allows using your own dashboards without modifying the project.
+  Brings a project's Grafana dashboards into the lab, so they can live in
+  the project's repository. Grafana rescans its dashboards every 10
+  seconds, so changes show up without a restart.
 
 ${chalk.bold("Actions:")}
-  link <dir>    Symlink external dashboard directory (recommended)
-  copy <dir>    Copy dashboards to lab (permanent)
+  link <dir>    Copy the dashboard JSON files at the top of <dir> into the lab
+                (replacing the previously linked ones); run again to sync
   list          List current dashboards
-  unlink        Remove symlinked dashboards
+  unlink        Remove the linked dashboards
 
 ${chalk.bold("Examples:")}
   ${chalk.green("ltlab dashboard link ~/projects/my-api/dashboards")}   ${chalk.dim("Link external dashboards")}
-  ${chalk.green("ltlab dashboard copy ./my-dashboards")}                 ${chalk.dim("Copy dashboards to lab")}
   ${chalk.green("ltlab dashboard list")}                                 ${chalk.dim("List all dashboards")}
   ${chalk.green("ltlab dashboard unlink")}                               ${chalk.dim("Remove linked dashboards")}
 
 ${chalk.bold("Dashboard Format:")}
-  Grafana JSON export format. Export from Grafana UI or create manually.
-
-${chalk.bold("After linking/copying:")}
-  Restart Grafana: ${chalk.cyan("ltlab restart -s grafana")}
+  A dashboard's JSON model (Dashboard settings > JSON Model in Grafana).
 `,
   )
   .action(dashboardCmd);

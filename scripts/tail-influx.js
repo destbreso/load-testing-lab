@@ -1,20 +1,18 @@
 #!/usr/bin/env node
 import axios from "axios";
 import dotenv from "dotenv";
+import { fileURLToPath } from "url";
 
-dotenv.config();
+// The lab's own .env, wherever the script is run from
+dotenv.config({ path: fileURLToPath(new URL("../.env", import.meta.url)), quiet: true });
 
-const INFLUX_URL = process.env.INFLUXDB_URL;
+const INFLUX_URL =
+  process.env.INFLUXDB_URL || `http://localhost:${process.env.INFLUXDB_PORT_EXPORT || 8086}`;
 const INFLUX_TOKEN = process.env.INFLUXDB_TOKEN;
 const INFLUX_ORG = process.env.INFLUXDB_ORG;
 const BUCKET = process.env.INFLUXDB_BUCKET || "loadtests";
 
 // check env
-if (!INFLUX_URL) {
-  console.error("❌ INFLUXDB_URL is not set in your environment.");
-  process.exit(1);
-}
-
 if (!INFLUX_TOKEN) {
   console.error("❌ INFLUXDB_TOKEN is not set in your environment.");
   process.exit(1);

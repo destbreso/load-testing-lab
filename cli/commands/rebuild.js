@@ -1,6 +1,6 @@
-import { spawn } from "child_process";
 import inquirer from "inquirer";
 import chalk from "chalk";
+import { compose, composeDisplay, exitCodeOf } from "../lib/lab.js";
 
 const SERVICES = [
   { name: "All services", value: "all" },
@@ -12,47 +12,42 @@ const SERVICES = [
 export default async function rebuildCmd(options) {
   let { service } = options;
 
-  // If service not provided, show interactive selector
   if (!service) {
     const answer = await inquirer.prompt([
-      {
-        type: "select",
-        name: "service",
-        message: "Select service to rebuild:",
-        choices: SERVICES,
-      },
+      { type: "select", name: "service", message: "Select service to rebuild:", choices: SERVICES },
     ]);
     service = answer.service;
   }
 
-  // Determine which command to execute
-  const cmd = "docker-compose";
-  let args;
-  let displayName;
-
-  if (service === "all") {
-    args = ["build", "--no-cache"];
-    displayName = "all services";
-  } else {
-    args = ["build", "--no-cache", service];
-    displayName = service;
+  if (!SERVICES.some((s) => s.value === service)) {
+    console.error(chalk.red(`Unknown service: ${service}`));
+    console.log(chalk.yellow(`Choose one of: ${SERVICES.map((s) => s.value).join(", ")}`));
+    process.exitCode = 1;
+    return;
   }
 
-  console.log(chalk.blue(`\n▶ Rebuilding ${displayName} (clean build - no cache)...`));
-  console.log(chalk.dim(`  Command: ${cmd} ${args.join(" ")}\n`));
+  const services = service === "all" ? ["k6", "artillery", "toy-api"] : [service];
+  const args = ["build", "--no-cache", ...services];
+
+  console.log(chalk.blue(`\n▶ Rebuilding ${services.join(", ")} (clean build, no cache)...`));
+  console.log(chalk.dim(`  Command: ${await composeDisplay(args)}\n`));
   console.log(chalk.yellow("⚠️  This may take several minutes...\n"));
 
-  const child = spawn(cmd, args, { stdio: "inherit", shell: true });
+  try {
+    await compose(args);
 
-  child.on("exit", (code) => {
-    if (code === 0) {
-      console.log(chalk.green(`\n✓ ${displayName} rebuilt successfully!`));
-      console.log(chalk.cyan(`\nNext steps:`));
-      console.log(chalk.dim(`  1. Stop services: ${chalk.green("ltlab stop")}`));
-      console.log(chalk.dim(`  2. Start services: ${chalk.green("ltlab start")}`));
-    } else {
-      console.log(chalk.red(`\n✗ Rebuild failed with exit code ${code}`));
+    // The runners use the new image on their next run; a running toy API is
+    // recreated from its new image now
+    if (services.includes("toy-api")) {
+      const { stdout } = await compose(["ps", "-q", "toy-api"], { stdio: "pipe" });
+      if (stdout.trim()) {
+        console.log(chalk.blue("\n▶ Recreating the running toy API from the new image..."));
+        await compose(["up", "-d", "--no-deps", "--wait", "toy-api"]);
+      }
     }
-    process.exit(code);
-  });
+    console.log(chalk.green(`\n✓ ${services.join(", ")} rebuilt.`));
+  } catch (err) {
+    console.log(chalk.red(`\n✗ Rebuild failed with exit code ${exitCodeOf(err)}`));
+    process.exitCode = exitCodeOf(err);
+  }
 }

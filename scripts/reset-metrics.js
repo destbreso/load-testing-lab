@@ -1,12 +1,17 @@
 #!/usr/bin/env node
-import "dotenv/config";
+import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+
+// The lab's own .env, wherever the script is run from
+dotenv.config({ path: fileURLToPath(new URL("../.env", import.meta.url)), quiet: true });
 import axios from "axios";
 import chalk from "chalk";
 
 async function resetMetrics() {
-  const influxUrl = process.env.INFLUXDB_URL || "http://localhost:8086";
-  const org = process.env.INFLUXDB_ORG || "ltl";
-  const token = process.env.INFLUXDB_TOKEN || "admin123";
+  const influxUrl =
+    process.env.INFLUXDB_URL || `http://localhost:${process.env.INFLUXDB_PORT_EXPORT || 8086}`;
+  const org = process.env.INFLUXDB_ORG || "myorg";
+  const token = process.env.INFLUXDB_TOKEN || "";
 
   console.log(chalk.blue("🗑️  Resetting InfluxDB metrics...\n"));
 
@@ -86,7 +91,7 @@ async function resetMetrics() {
       console.log(chalk.cyan("   ltlab start\n"));
     } else if (err.response?.status === 401) {
       console.log(
-        chalk.yellow("\n💡 Authentication failed. Check your token in .env"),
+        chalk.yellow("\n💡 Authentication failed. Check INFLUXDB_TOKEN in the lab's .env"),
       );
     } else if (err.response?.status === 404) {
       console.log(
