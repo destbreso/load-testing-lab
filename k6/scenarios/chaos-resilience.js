@@ -1,11 +1,12 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { Rate, Counter } from 'k6/metrics';
+import { Rate, Counter, Trend } from 'k6/metrics';
 
 // Custom metrics
 const errorRate = new Rate('errors');
-const timeoutRate = new Rate('timeouts');
 const retryCounter = new Counter('retries');
+// Attempts each call to /error needed (1 to 3)
+const attempts = new Trend('attempts');
 
 export const options = {
   stages: [
@@ -16,7 +17,8 @@ export const options = {
   thresholds: {
     'http_req_duration': ['p(90)<4000'],
     'errors': ['rate<0.4'],
-    'retries': ['count<1000'],
+    // /error fails 30% of the time, so a call needs 1.39 attempts on average
+    'attempts': ['avg<1.5'],
   },
 };
 
@@ -52,6 +54,7 @@ export default function () {
   
   // Track final result
   errorRate.add(!success);
+  attempts.add(attempt);
   
   // Also test other endpoints occasionally
   if (Math.random() < 0.3) {

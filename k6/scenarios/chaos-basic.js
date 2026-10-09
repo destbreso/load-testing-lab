@@ -45,7 +45,7 @@ export default function () {
   // Execute request
   const res = http.get(selectedScenario.url, {
     timeout: '5s',
-    tags: { scenario: selectedScenario.name },
+    tags: { endpoint: selectedScenario.name },
   });
   
   // Track metrics

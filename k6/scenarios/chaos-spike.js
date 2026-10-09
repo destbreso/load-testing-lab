@@ -5,7 +5,8 @@ import { Rate, Trend } from "k6/metrics";
 // Custom metrics
 const errorRate = new Rate("errors");
 const timeoutRate = new Rate("timeouts");
-const recoveryTime = new Trend("recovery_time");
+// Time for one pass through the four routes, pauses included
+const passDuration = new Trend("pass_duration", true);
 
 export const options = {
   stages: [
@@ -64,8 +65,7 @@ export default function () {
     sleep(0.2);
   }
 
-  // Track total recovery time for this iteration
-  recoveryTime.add(Date.now() - startTime);
+  passDuration.add(Date.now() - startTime);
 
   // Variable think time based on chaos
   if (errorCount > 2) {

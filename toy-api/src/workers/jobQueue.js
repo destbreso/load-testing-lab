@@ -3,6 +3,10 @@ import { jobStore } from "./jobStore.js";
 const queue = [];
 let isProcessing = false;
 
+// A finished job stays readable through GET /jobs/:id for this long, then
+// leaves the store, so the API's memory stays bounded however long it runs
+const JOB_TTL_MS = Number(process.env.JOB_TTL_MS) || 10 * 60 * 1000;
+
 export function enqueueJob(job) {
   queue.push(job);
   jobStore.set(job.id, job);
@@ -34,6 +38,7 @@ async function runJob(job) {
     job.result = { error: err.message };
   } finally {
     job.finishedAt = Date.now();
+    setTimeout(() => jobStore.delete(job.id), JOB_TTL_MS).unref();
   }
 }
 
