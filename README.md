@@ -17,12 +17,14 @@ A complete, containerized performance testing platform for modern APIs and micro
 - ✅ Example k6 & Artillery scenarios  
 - ✅ Toy API (8 endpoints for testing)
 - ✅ Full InfluxDB v2 + Telegraf stack
-- ✅ CLI with 18 commands
+- ✅ CLI with 15 commands
 - ✅ **External project support** - Use your own scenarios from any folder
 
 ---
 
 ## 🚀 Quick Start
+
+Requirements: Docker with Docker Compose v2, and Node.js 22.13 or later.
 
 ```bash
 # 1. Clone and install CLI globally
@@ -30,16 +32,21 @@ git clone https://github.com/destbreso/load-testing-lab.git
 cd load-testing-lab
 npm install && npm link
 
-# 2. Start the lab (InfluxDB, Grafana, Telegraf, Toy API)
+# 2. Create the lab's .env (the defaults work with the toy API; the InfluxDB token is generated for you)
+ltlab configure
+
+# 3. Start the lab (InfluxDB, Grafana, Telegraf, Toy API); it returns once every service is ready
 ltlab start
 
-# 3. Run tests with built-in scenarios
+# 4. Run tests with built-in scenarios
 ltlab k6 -s toy-fast.js
 ltlab artillery -s toy-fast.yml
 
-# 4. View dashboards
+# 5. View dashboards
 open http://localhost:3000  # Grafana (admin/admin123)
 ```
+
+Every `ltlab` command works from any directory and reads the lab's own `.env`.
 
 ---
 
@@ -61,7 +68,14 @@ ltlab artillery -s ./load-tests/smoke-test.yml
 
 # You can also use absolute paths
 ltlab k6 -s /Users/me/projects/payment-api/tests/checkout.js
+
+# Pass environment variables: KEY=value as given, KEY alone takes the value from your shell
+ltlab k6 -s ./load-tests/stress-test.js -e API_TOKEN -e TARGET_API_URL=http://host.docker.internal:3000
 ```
+
+`ltlab k6` and `ltlab artillery` exit with the runner's exit code (k6: 99 when a threshold fails; Artillery: 1 when an `ensure` check fails), so they can gate a CI job.
+
+An Artillery scenario sends metrics to the lab only when its `config.plugins` declares Artillery's built-in publish-metrics plugin (the built-in scenarios and the blueprints do): see [Custom Artillery Scenarios](docs/USAGE.md#custom-artillery-scenarios).
 
 ### Complex Scenarios (Multiple Files, Helpers, Data)
 
@@ -97,9 +111,6 @@ Add your own dashboards without modifying the lab:
 # Link dashboards from your project (copies to lab's custom/ folder)
 ltlab dashboard link ~/projects/my-api/dashboards
 
-# Restart Grafana to load them
-ltlab restart -s grafana
-
 # List current dashboards
 ltlab dashboard list
 
@@ -107,7 +118,9 @@ ltlab dashboard list
 ltlab dashboard unlink
 ```
 
-> **Note:** Your project folder is the **source of truth**. The lab's `custom/` folder is ignored by git. To sync changes, run `link` again.
+Grafana rescans its dashboards every 10 seconds, so linked dashboards appear in a folder named "custom" without a restart, and unlinked ones disappear the same way.
+
+> **Note:** Your project folder is the **source of truth**. The lab's `custom/` folder is ignored by git. To sync changes, run `link` again. Grafana keeps no state of its own: a dashboard edited in Grafana's UI is lost at the next stop or restart unless you export its JSON to your project.
 
 **📚 Complete guide:** [External Projects Guide](docs/EXTERNAL_PROJECTS.md)
 
@@ -148,19 +161,20 @@ Or create your own files anywhere and run them directly!
 
 ## ✨ Key Features
 
-### 🎯 Zero Configuration
-- Works out-of-the-box with sensible defaults
+### 🎯 Minimal Configuration
+- One `ltlab configure` run, with defaults that work with the built-in toy API
+- The InfluxDB token is generated for you and shared by InfluxDB, k6, Telegraf and Grafana
 - Auto-configured k6 with xk6-influxdb
-- Artillery + Telegraf integration via StatsD
+- Artillery metrics through Artillery's built-in publish-metrics plugin (StatsD) and Telegraf
 - Grafana dashboards auto-provisioned
 
 ### 📊 Professional Dashboards
 **6 production-ready Grafana dashboards:**
 
 - **k6**: War Room, Pro, Elite (with heatmaps & percentiles)
-- **Artillery**: Basic, Pro, Elite (scenario tracking)
+- **Artillery**: War Room, Pro, Elite (scenario tracking)
 
-Real-time visualization of:
+Real-time visualization (every dashboard refreshes every 5 seconds) of:
 
 - Response time (p50, p95, p99)
 - Requests per second (RPS)
@@ -169,17 +183,18 @@ Real-time visualization of:
 - Bandwidth and network metrics
 
 ### Professional CLI
-**18 commands for streamlined testing:**
+**15 commands for streamlined testing:**
 
 ```bash
-ltlab configure   # Interactive setup
-ltlab start       # Start lab
+ltlab configure   # Interactive setup (creates the lab's .env)
+ltlab start       # Start lab, wait until every service is ready
 ltlab k6          # Run k6 tests (supports external files)
 ltlab artillery   # Run Artillery tests (supports external files)
 ltlab generate    # Generate scenarios from blueprints
 ltlab dashboard   # Manage custom Grafana dashboards
-ltlab restart     # Restart services
-ltlab rebuild     # Clean rebuild
+ltlab info        # Configuration and service health
+ltlab restart     # Recreate services with the current .env
+ltlab rebuild     # Clean rebuild of an image (no cache)
 ltlab purge       # Full reset
 ```
 
@@ -187,6 +202,7 @@ ltlab purge       # Full reset
 ```bash
 ltlab k6 -s ./local-file.js              # Auto-detect local files
 ltlab k6 -p ./my-project -s main.js      # Mount project with helpers
+ltlab k6 -s ./local-file.js -e API_TOKEN # Pass a variable from your shell
 ltlab dashboard link ./my-dashboards     # Link external dashboards
 ```
 
@@ -202,7 +218,7 @@ ltlab dashboard link ./my-dashboards     # Link external dashboards
 - `/cpu` - CPU-intensive workload
 - `/io` - Simulated I/O operations (300-1500ms)
 - `/users` - JSON dataset (50 users)
-- `/jobs` - Async job creation + status
+- `/jobs` - Async job creation + status (a finished job is kept for 10 minutes)
 
 Test and Learn without external dependencies!
 
@@ -225,11 +241,11 @@ flowchart LR
 **Components:**
 
 - **k6 + xk6-influxdb** - Modern load testing with auto InfluxDB integration
-- **Artillery + Telegraf** - YAML-based testing with StatsD metrics
+- **Artillery + Telegraf** - YAML-based testing, metrics through Artillery's publish-metrics plugin (StatsD) and Telegraf
 - **InfluxDB v2** - Time-series metrics storage
 - **Grafana** - 6 professional dashboards
-- **Docker Compose** - Complete containerized stack
-- **Professional CLI** - 16 commands for operations
+- **Docker Compose** - Complete containerized stack (k6 and Artillery run only during a test)
+- **Professional CLI** - 15 commands for operations
 - **Toy API** - Built-in test endpoints
 
 **[Detailed Architecture →](docs/README.md#architecture)**
@@ -276,7 +292,7 @@ flowchart LR
 ## 🎓 Learning Resources
 
 ### Complete Course Series
-**13 articles from beginner to advanced:**
+**Three series, from a first test to custom dashboards:**
 
 🎓 **[Load Testing Course on destbreso.com →](https://destbreso.com)**
 
@@ -298,12 +314,12 @@ Topics covered:
 | Component                | Status     | Notes                           |
 |--------------------------|------------|---------------------------------|
 | **k6 + xk6-influxdb**    | 🟢 Working | Auto-configured, zero setup     |
-| **Artillery + Telegraf** | 🟢 Working | StatsD integration complete     |
+| **Artillery + Telegraf** | 🟢 Working | publish-metrics over StatsD     |
 | **InfluxDB v2**          | 🟢 Working | Time-series storage ready       |
 | **Grafana**              | 🟢 Working | 6 dashboards auto-provisioned   |
-| **Professional CLI**     | 🟢 Working | 18 commands available           |
+| **Professional CLI**     | 🟢 Working | 15 commands available           |
 | **External Projects**    | 🟢 Working | Mount scenarios from any folder |
-| **Custom Dashboards**    | 🟢 Working | Link/copy external dashboards   |
+| **Custom Dashboards**    | 🟢 Working | Link dashboards, no restart     |
 | **Toy API**              | 🟢 Working | 8 test endpoints                |
 
 ---
@@ -367,5 +383,3 @@ If this project helps you:
 ---
 
 **Ready to start?** → **[Setup Guide](docs/SETUP.md)** | **[Complete Documentation](docs/README.md)**
-
-**Last Updated:** February 2, 2026

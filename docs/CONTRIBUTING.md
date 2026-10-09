@@ -106,9 +106,8 @@ For new features or improvements:
 
 ### Prerequisites
 
-- Docker >= 24.0
-- Docker Compose >= 2.18
-- Node.js >= 22.13
+- Docker, with Docker Compose v2 or later (the `docker compose` plugin, or the standalone `docker-compose` v2 binary; the CLI uses whichever it finds)
+- Node.js 22.13 or later
 - Git
 
 ### Installation
@@ -118,27 +117,28 @@ For new features or improvements:
 git clone https://github.com/YOUR_USERNAME/load-testing-lab.git
 cd load-testing-lab
 
-# 2. Install CLI dependencies
+# 2. Install CLI dependencies and link the ltlab command
 npm install
+npm link
 
-# 3. Copy example .env
-cp .env.example .env
+# 3. Create the lab's .env (it also generates the InfluxDB token)
+ltlab configure
 
-# 4. Start services
-docker-compose up -d
+# 4. Start services (returns when every service is ready)
+ltlab start
 
 # 5. Verify configuration
-node scripts/check-influx-token.js
+npm run check-influx
 
 # 6. Run verification test
-docker-compose run --rm k6 run /k6/scenarios/toy-fast.js
+ltlab k6 -s toy-fast.js
 ```
 
 ### Local Development
 
 ```bash
-# View logs
-docker-compose logs -f
+# View logs, from the lab's root directory (services: influxdb, grafana, telegraf, toy-api)
+docker compose logs -f
 
 # Rebuild specific image
 ltlab rebuild -s k6
@@ -146,9 +146,14 @@ ltlab rebuild -s k6
 # Run tests
 ltlab k6 -s toy-mixed.js
 
+# Check both pipelines end to end (k6 and Artillery to InfluxDB)
+./scripts/e2e-test.sh
+
 # Clean everything (DANGER: deletes all data)
 ltlab purge
 ```
+
+The `ltlab` commands work from any directory and read only the lab's `.env`, so you can try a change from another folder too.
 
 ---
 
@@ -178,7 +183,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 **Examples:**
 ```bash
 feat(k6): add new stress test scenario
-fix(influxdb): correct token in Grafana datasource
+fix(grafana): correct a panel's Flux query
 docs(readme): update troubleshooting section
 chore(deps): update InfluxDB image to v2.7
 ```
@@ -306,37 +311,54 @@ fi
 
 ```
 load-testing-lab/
-├── k6/                      # k6 tests and configuration
-│   ├── Dockerfile           # Image with xk6-influxdb
-│   ├── entrypoint.sh        # Automatic InfluxDB config
-│   └── scenarios/           # Test scenarios
-├── artillery/               # Artillery tests
-│   ├── Dockerfile
-│   └── scenarios/
-├── grafana/                 # Grafana dashboards and config
-│   ├── dashboards/          # JSON dashboards (auto-provisioned)
-│   └── provisioning/        # Datasources and dashboard config
-├── influxdb/                # InfluxDB configuration
-│   └── config/
-├── telegraf/                # Telegraf configuration
-│   └── telegraf.conf
-├── toy-api/                 # Test API
-│   ├── routes/              # API endpoints
-│   └── app.js               # Main application
-├── cli/                     # CLI commands
-│   ├── commands/            # Command implementations
-│   └── blueprints/          # Scenario blueprints
-├── scripts/                 # Utilities and helpers
-│   ├── basic/
-│   └── advanced/
-└── docs/                    # Documentation
-    ├── README.md
-    ├── SETUP.md
-    ├── USAGE.md
-    ├── DASHBOARDS.md
-    ├── TROUBLESHOOTING.md
-    ├── CONTRIBUTING.md
-    └── CHANGELOG.md
+├── k6/                          # k6 runner
+│   ├── Dockerfile               # k6 v1.8.1 built with xk6-output-influxdb v0.7.0 (pinned)
+│   ├── entrypoint.sh            # Sends k6's metrics to InfluxDB when org, bucket and token are set
+│   └── scenarios/               # Built-in scenarios (toy-*, chaos-*), each with its options inline
+├── artillery/                   # Artillery runner
+│   ├── Dockerfile               # artillery@2.0.34 on node:22-alpine
+│   └── scenarios/               # Built-in scenarios (toy-*, chaos-*)
+├── grafana/
+│   ├── dashboards/              # The six built-in dashboards (General folder)
+│   │   └── custom/              # Copies made by `ltlab dashboard link` (git-ignored)
+│   └── provisioning/
+│       ├── dashboards/          # dashboards.yaml: file provider, rescanned every 10 seconds
+│       └── datasources/         # influxdb.yaml: token, org and bucket from the environment
+├── telegraf/
+│   └── telegraf.conf            # StatsD in (from Artillery), InfluxDB v2 out
+├── toy-api/                     # Test API
+│   ├── Dockerfile               # node:22-alpine, installed from yarn.lock
+│   ├── package.json
+│   ├── yarn.lock
+│   └── src/
+│       ├── index.js             # Express app, registers the routes
+│       ├── routes/              # fast, slow, error, cpu, io, users, jobs, health
+│       ├── workers/             # In-memory job queue and store
+│       └── utils/
+├── cli/                         # The ltlab CLI
+│   ├── index.js                 # Entry point: registers every command
+│   ├── commands/                # One file per command
+│   ├── lib/                     # lab.js (lab root, .env, Docker Compose), run-scenario.js
+│   └── blueprints/              # Templates for `ltlab generate` (k6/, artillery/)
+├── scripts/                     # E2E and integration tests, InfluxDB helpers
+│   ├── e2e-test.sh
+│   ├── test-artillery-integration.sh
+│   ├── reset-metrics.js         # Used by `ltlab reset` (reset-metrics.sh wraps it)
+│   ├── check-influx-token.js    # npm run check-influx
+│   ├── tail-influx.js           # npm run tail-influx
+│   ├── run-k6.sh
+│   └── run-artillery.sh
+├── docs/                        # Documentation
+│   ├── README.md
+│   ├── SETUP.md
+│   ├── USAGE.md
+│   ├── DASHBOARDS.md
+│   ├── TROUBLESHOOTING.md
+│   ├── CONTRIBUTING.md
+│   └── CHANGELOG.md
+├── docker-compose.yml           # The lab's stack
+├── docker-compose.prod.yml      # The same stack with restart policies
+└── package.json                 # CLI dependencies and npm scripts
 ```
 
 ### Adding New Components
@@ -345,8 +367,9 @@ load-testing-lab/
 
 1. Create file in `k6/scenarios/my-test.js`
 2. Define options and default function
-3. Don't configure InfluxDB manually (done automatically)
-4. Document the scenario if relevant
+3. Don't configure InfluxDB manually: the image's entrypoint sends every run's metrics
+4. Read the target from `__ENV.TARGET_API_URL`
+5. Document the scenario if relevant
 
 ```javascript
 // k6/scenarios/my-test.js
@@ -367,6 +390,15 @@ export default function () {
 }
 ```
 
+#### New Artillery Scenario
+
+1. Create file in `artillery/scenarios/my-test.yml`
+2. Keep the `publish-metrics` block of the other scenarios in its `config` (type `statsd`, host and port from `STATSD_HOST` and `STATSD_PORT`, prefix `artillery.`), or its metrics do not reach InfluxDB
+3. Give its scenarios names without spaces (StatsD cuts a name at its first space)
+4. For `ensure` thresholds or `expect` checks, list `ensure: {}` or `expect` under `plugins`, as `toy-fast.yml` and the chaos scenarios do
+
+See [ARTILLERY_INFLUXDB_GUIDE.md](ARTILLERY_INFLUXDB_GUIDE.md) for what reaches InfluxDB.
+
 #### New Grafana Dashboard
 
 See detailed guide in [DASHBOARDS.md](DASHBOARDS.md#customizing-dashboards).
@@ -374,8 +406,9 @@ See detailed guide in [DASHBOARDS.md](DASHBOARDS.md#customizing-dashboards).
 **Quick steps:**
 1. Create dashboard in Grafana UI (http://localhost:3000)
 2. Export JSON: Settings → JSON Model
-3. Save to `grafana/dashboards/your-dashboard.json`
-4. Restart Grafana: `ltlab restart -s grafana`
+3. Give it its own `uid` and `title`, point panels at the datasource with uid `influxdb`, and read `from(bucket: v.defaultBucket)` in queries
+4. Save to `grafana/dashboards/your-dashboard.json`
+5. Grafana loads it within 10 seconds, without a restart (it keeps no state, so the file is what counts)
 
 **When to contribute a dashboard:**
 - ✅ Generalizable and useful for community
@@ -384,17 +417,19 @@ See detailed guide in [DASHBOARDS.md](DASHBOARDS.md#customizing-dashboards).
 
 #### New Toy API Endpoint
 
-1. Create route file in `toy-api/routes/`
-2. Register route in `toy-api/app.js`
-3. Test locally: `cd toy-api && npm run dev`
-4. Rebuild: `ltlab rebuild -s toy-api`
+1. Create route file in `toy-api/src/routes/`
+2. Register route in `toy-api/src/index.js` (`app.use("/my-route", myRoute)`)
+3. Rebuild: `ltlab rebuild -s toy-api` (a running toy API is recreated from the new image)
+4. Try it: `curl http://localhost:5000/my-route`
+5. If you add a dependency, update `toy-api/yarn.lock` too: the image installs with `yarn install --frozen-lockfile --production`, which fails when the lockfile is out of date
 
 #### New CLI Command
 
-1. Create command file in `cli/commands/`
-2. Export command configuration
-3. Test with `ltlab your-command`
-4. Document in CLI README
+1. Create command file in `cli/commands/`, exporting a default async function
+2. Register it in `cli/index.js` (`program.command(...).description(...).action(...)`)
+3. Use the helpers in `cli/lib/lab.js`: `compose(args)` runs Docker Compose from the lab's root, `readLabEnv()` reads the lab's `.env`, and `exitCodeOf(err)` turns a failure into `process.exitCode`, so the command works from any directory and reports failures through its exit code
+4. Test with `ltlab your-command`, also from another directory
+5. Document in [cli/README.md](../cli/README.md)
 
 ---
 
@@ -412,7 +447,7 @@ import { Trend } from 'k6/metrics';
 const tokenCount = new Trend('llm_token_count');
 
 export default function () {
-  const res = http.post('https://api.openai.com/v1/completions', payload);
+  const res = http.post(`${__ENV.TARGET_API_URL}/completions`, payload);
   const data = JSON.parse(res.body);
   tokenCount.add(data.usage.total_tokens);
 }
@@ -437,12 +472,13 @@ export default function () {
 
 #### Cache Performance
 ```javascript
+import http from 'k6/http';
 import { Rate } from 'k6/metrics';
 
 const cacheHitRate = new Rate('cache_hits');
 
 export default function () {
-  const res = http.get('/api/data');
+  const res = http.get(`${__ENV.TARGET_API_URL}/api/data`);
   const isCacheHit = res.headers['X-Cache-Status'] === 'HIT';
   cacheHitRate.add(isCacheHit);
 }
@@ -515,9 +551,5 @@ Every contribution, no matter how small, is valued and appreciated. Together we'
 ## Additional Resources
 
 - [Blog: Introduction to Load Testing Lab](https://destbreso.com/blog/why-a-dedicated-load-testing-lab) - Project philosophy and goals
-- [Blog: Architecture Overview](https://destbreso.com/blog/performance-engineering-validation-capacity-resilience) - Strategic approaches to performance engineering
+- [Blog: Validation, Capacity and Resilience](https://destbreso.com/blog/performance-engineering-validation-capacity-resilience) - Strategic approaches to performance engineering
 - [Blog Series Overview](https://destbreso.com/blog/series/load-testing-lab-guide) - Complete tutorial series
-
----
-
-**Last Updated:** January 29, 2026

@@ -1,19 +1,21 @@
 # 🔧 Diagnosis and Solution: Load Testing Lab
 
-> **Technical troubleshooting document**  
+> **Technical troubleshooting document**: how metrics get from k6 to InfluxDB, and the diagnosis that shaped it  
 > For daily use and Quick Start, see [README.md](README.md)
 
 ---
 
 ## 📋 Problem Summary
 
-The **load-testing-lab** project exhibited the following symptoms:
+The **load-testing-lab** project once exhibited the following symptoms:
 
 - ✅ Docker containers started correctly
 - ✅ k6 and Artillery tests executed
 - ❌ **No data was stored in InfluxDB**
 - ❌ **Grafana showed no data** (empty dashboards)
 - ❌ **Unable to access data from Grafana**
+
+The sections below record what caused it and describe how each piece works today.
 
 ---
 
@@ -23,7 +25,7 @@ The **load-testing-lab** project exhibited the following symptoms:
 
 **Problem:** The `K6_OUT` environment variable was commented out in `docker-compose.yml`, so k6 didn't know where to send metrics.
 
-**Location:** [docker-compose.yml](docker-compose.yml#L97-L105)
+**Location:** the `k6` service in [docker-compose.yml](../docker-compose.yml)
 
 ```yaml
 # ❌ BEFORE (commented out)
@@ -49,19 +51,21 @@ The **load-testing-lab** project exhibited the following symptoms:
 
 ### 3. **Incorrect Grafana token**
 
-**Problem:** The token configured in Grafana (`influxdb.yaml`) was different from the actual InfluxDB token configured in `.env`.
+**Problem:** The token configured in Grafana's datasource (`influxdb.yaml`) was different from the actual InfluxDB token configured in `.env`.
 
-**Location:** [grafana/provisioning/datasources/influxdb.yaml](grafana/provisioning/datasources/influxdb.yaml#L14)
+**Location:** [grafana/provisioning/datasources/influxdb.yaml](../grafana/provisioning/datasources/influxdb.yaml)
 
 ```yaml
-# ❌ BEFORE
+# ❌ BEFORE: a token copied into the file, which drifted from .env
 secureJsonData:
-  token: <the token from .env>
+  token: <a token pasted into the file>
 
-# ✅ AFTER (synchronized with .env)
+# ✅ NOW: no token in the file; Grafana reads it from its environment
 secureJsonData:
-  token: <the token from .env>
+  token: ${INFLUXDB_TOKEN}
 ```
+
+The datasource reads `${INFLUXDB_TOKEN}`, `${INFLUXDB_ORG}` and `${INFLUXDB_BUCKET}` from Grafana's environment, which Compose fills from `.env`, so it cannot drift from the token the rest of the lab uses, and no token is committed in the repository. See [The token, from .env to every service](#4-the-token-from-env-to-every-service).
 
 ### 4. **k6 scripts with incorrect references**
 
@@ -73,51 +77,79 @@ secureJsonData:
 // ❌ BEFORE
 export let options = config; // config is not defined
 
-// ✅ AFTER
-import config from "../k6.config.js";
-export let options = config;
+// ✅ NOW: each scenario declares its options inline, as every scenario in k6/scenarios/ does
+export const options = {
+  vus: 10,
+  duration: "30s",
+};
 ```
 
 ---
 
 ## ✅ Implemented Solutions
 
-### 1. Created `k6/entrypoint.sh`
+### 1. `k6/entrypoint.sh`
 
-Script that correctly configures environment variables for xk6-influxdb:
+The k6 image runs this script before k6. When `INFLUXDB_ORG`, `INFLUXDB_BUCKET` and `INFLUXDB_TOKEN` are all set, it maps them to the extension's variables and turns the output on (abridged):
 
 ```bash
 #!/bin/sh
-export K6_INFLUXDB_ORGANIZATION="$INFLUXDB_ORG"
-export K6_INFLUXDB_BUCKET="$INFLUXDB_BUCKET"
-export K6_INFLUXDB_TOKEN="$INFLUXDB_TOKEN"
-export K6_INFLUXDB_ADDR="http://influxdb:8086"
-export K6_INFLUXDB_INSECURE=true
-export K6_OUT="xk6-influxdb"
+set -e
+
+if [ -n "$INFLUXDB_BUCKET" ] && [ -n "$INFLUXDB_ORG" ] && [ -n "$INFLUXDB_TOKEN" ]; then
+  export K6_INFLUXDB_ORGANIZATION="$INFLUXDB_ORG"
+  export K6_INFLUXDB_BUCKET="$INFLUXDB_BUCKET"
+  export K6_INFLUXDB_TOKEN="$INFLUXDB_TOKEN"
+  export K6_INFLUXDB_ADDR="http://influxdb:8086"
+  export K6_INFLUXDB_INSECURE=true
+  export K6_OUT="xk6-influxdb"
+  echo "✅ K6 InfluxDB configured:"
+  # ...prints the organization, bucket and address
+else
+  echo "⚠️  WARNING: InfluxDB variables not configured, K6_OUT not available"
+fi
 
 exec /usr/bin/k6 "$@"
 ```
 
-### 2. Updated `k6/Dockerfile`
+Without the three values, k6 still runs, but prints the warning and sends no metrics. The compose file gives the organization and bucket defaults (`myorg`, `loadtests`), so in practice the token in `.env` decides.
 
-Modified to copy and use the custom entrypoint:
+### 2. `k6/Dockerfile`: a pinned build
+
+The image builds k6 with the extension and copies the binary onto the official k6 image, with the custom entrypoint (without its comments):
 
 ```dockerfile
+FROM golang:1.26-alpine AS builder
+ENV GOTOOLCHAIN=auto
+RUN apk add --no-cache git
+RUN go install go.k6.io/xk6/cmd/xk6@v1.4.14
+WORKDIR /src
+RUN xk6 build v1.8.1 --with github.com/grafana/xk6-output-influxdb@v0.7.0 --output /src/k6
+
+FROM grafana/k6:0.49.0
+COPY --from=builder /src/k6 /usr/bin/k6
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 ```
 
-### 3. Updated `docker-compose.yml`
+Every version is pinned. xk6-output-influxdb is built for k6 v1: a build that picks k6 v2 leaves the extension out without an error, and k6 then rejects `K6_OUT=xk6-influxdb` as an invalid output type, so no metrics reach InfluxDB. `GOTOOLCHAIN=auto` lets the builder download a newer Go when xk6 or a dependency asks for one. To rebuild the image from scratch: `ltlab rebuild -s k6`.
 
-Removed entrypoint override to use the one configured in the Dockerfile.
+### 3. `docker-compose.yml`
 
-### 4. Fixed token in `grafana/provisioning/datasources/influxdb.yaml`
+There is no entrypoint override for k6, so the Dockerfile's entrypoint runs. The `k6` service receives `INFLUXDB_TOKEN`, `INFLUXDB_ORG` (default `myorg`) and `INFLUXDB_BUCKET` (default `loadtests`) from `.env`. It belongs to the Compose profile `runners`, so it starts only for a run (`ltlab k6`, or `docker compose run --rm k6 ...`), and it waits until InfluxDB passes its health check.
 
-Synchronized the token with the one in the `.env` file.
+### 4. The token, from `.env` to every service
+
+- `ltlab configure` writes the lab's `.env` and generates `INFLUXDB_TOKEN` (64 hexadecimal characters) when there is none; it keeps an existing one
+- On its first start, InfluxDB adopts that token as its admin token (`DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN}` in the compose file)
+- k6 (through the entrypoint), Telegraf (its InfluxDB output) and Grafana (its provisioned datasource) read the same value from their environment
+- `ltlab start` refuses to start without `.env` or without the token
+
+InfluxDB adopts the token only at its first setup, which is kept on the `influxdb-data` volume. If `.env` later holds a different token, InfluxDB rejects it with a 401, and `npm run check-influx` shows it. To fix it, put back the token InfluxDB knows; or create a token in InfluxDB's UI, write it to `INFLUXDB_TOKEN` in `.env` and run `ltlab restart -s all`; or run `ltlab purge` and `ltlab start`, which sets InfluxDB up again with the token in `.env` and deletes every stored metric.
 
 ### 5. Fixed k6 scripts
 
-- [k6/scenarios/toy-fast.js](k6/scenarios/toy-fast.js): Cleaned configuration
+- [k6/scenarios/toy-fast.js](../k6/scenarios/toy-fast.js): Cleaned configuration
 
 ---
 
@@ -126,7 +158,10 @@ Synchronized the token with the one in the `.env` file.
 ### Test executed successfully:
 
 ```bash
-docker-compose run --rm k6 run /k6/scenarios/toy-fast.js
+ltlab k6 -s toy-fast.js
+
+# Or, from the lab's root directory
+docker compose run --rm k6 run /k6/scenarios/toy-fast.js
 ```
 
 **Result:**
@@ -147,10 +182,15 @@ http_reqs: 1460 (286.23/s)
 ### Data verified in InfluxDB:
 
 ```bash
-curl "http://localhost:8086/api/v2/query?org=myorg" \
-  -H "Authorization: Token <token>" \
+# Last rows written in the past hour, read with the lab's .env
+npm run tail-influx
+
+# Or with the InfluxDB API, from the lab's root directory
+set -a; . ./.env; set +a
+curl "http://localhost:${INFLUXDB_PORT_EXPORT:-8086}/api/v2/query?org=${INFLUXDB_ORG}" \
+  -H "Authorization: Token ${INFLUXDB_TOKEN}" \
   -H "Content-Type: application/vnd.flux" \
-  -d 'from(bucket: "loadtests") |> range(start: -1h) |> limit(n:5)'
+  -d 'from(bucket: "'"${INFLUXDB_BUCKET:-loadtests}"'") |> range(start: -1h) |> limit(n:5)'
 ```
 
 **Result:** ✅ Data present (data_received, data_sent, http_req_duration, etc.)
@@ -159,68 +199,58 @@ curl "http://localhost:8086/api/v2/query?org=myorg" \
 
 ## 🚀 How to Use Now
 
-### 1. Start the complete stack:
+### 1. Configure the lab (first time only):
 
 ```bash
-docker-compose up -d
+npm install && npm link
+ltlab configure
 ```
 
-### 2. Run a k6 test:
+### 2. Start the complete stack:
 
 ```bash
-docker-compose run --rm k6 run /k6/scenarios/toy-fast.js
+ltlab start
 ```
 
-### 3. View metrics in Grafana:
+It returns when every service is ready.
+
+### 3. Run a k6 test:
+
+```bash
+ltlab k6 -s toy-fast.js
+```
+
+### 4. View metrics in Grafana:
 
 - URL: http://localhost:3000
-- User: `admin`
-- Password: `admin123`
+- User: `admin` (`GRAFANA_USER`)
+- Password: `admin123` (`GRAFANA_PASSWORD`)
 
 Dashboards should now display data correctly.
 
 ---
 
-## 📝 Pending / Limitations
+## 📝 Artillery and Limitations
 
-### Artillery does NOT send data to InfluxDB
+**Artillery** has no InfluxDB v2 output of its own. The lab sends its metrics through Telegraf: Artillery's built-in publish-metrics plugin reports over StatsD (prefix `artillery.`), Telegraf receives StatsD and writes to InfluxDB, and the Artillery dashboards read the result. Counters such as requests and status codes arrive exactly, so the totals in InfluxDB equal Artillery's summary. See [ARTILLERY_INFLUXDB_GUIDE.md](ARTILLERY_INFLUXDB_GUIDE.md).
 
-**Problem:** Artillery has no native support for InfluxDB v2.
-
-**Options to resolve:**
-
-#### Option 1: Use a custom plugin (Recommended)
-Artillery has plugins to send metrics:
-
-- `artillery-plugin-publish-metrics` (for InfluxDB v1 with compatibility)
-- Create a custom plugin that uses the InfluxDB v2 API
-
-#### Option 2: Use Telegraf as intermediary
-1. Add Telegraf to the stack
-2. Configure Artillery to send to StatsD/Telegraf
-3. Telegraf sends to InfluxDB v2
-
-#### Option 3: Log parser
-1. Artillery writes logs in JSON format
-2. A script parses and sends to InfluxDB
-
-**Recommendation:** If Artillery is critical for your project, implementing Option 2 (Telegraf) is the most robust.
+**Limitation:** Artillery sends percentiles already computed for each 10-second period, so InfluxDB cannot give an exact percentile for a whole Artillery run. The Artillery dashboards show each period's percentiles and, as stats, the highest value among them ("pXX, worst report"), an upper bound on the run's percentile. Artillery's end-of-test summary has the exact value. k6 stores every request's duration, so the k6 percentiles have no such limit.
 
 ---
 
-## 🔧 Modified Files
+## 🔧 Files Involved
 
-1. ✅ `k6/entrypoint.sh` - Created
-2. ✅ `k6/Dockerfile` - Updated
-3. ✅ `docker-compose.yml` - Updated
-4. ✅ `grafana/provisioning/datasources/influxdb.yaml` - Token fixed
+1. ✅ `k6/entrypoint.sh` - Maps the lab's variables to the extension's and turns the output on
+2. ✅ `k6/Dockerfile` - Pinned build of k6 with xk6-output-influxdb
+3. ✅ `docker-compose.yml` - Passes the token, organization and bucket from `.env`; InfluxDB adopts the token on its first start
+4. ✅ `grafana/provisioning/datasources/influxdb.yaml` - Reads the token, organization and bucket from Grafana's environment
 5. ✅ `k6/scenarios/toy-fast.js` - Cleaned
 
 ---
 
 ## 📚 Additional Resources
 
-- **[README.md](README.md)** - Main documentation with Quick Start and FAQ
+- **[README.md](README.md)** - Documentation hub
 - **[ARTILLERY_INFLUXDB_GUIDE.md](ARTILLERY_INFLUXDB_GUIDE.md)** - Artillery integration guide
 - [xk6-influxdb Documentation](https://github.com/grafana/xk6-output-influxdb)
 - [InfluxDB v2 API](https://docs.influxdata.com/influxdb/v2.0/api/)
@@ -230,11 +260,11 @@ Artillery has plugins to send metrics:
 
 ## 🎯 Conclusion
 
-**Main problem resolved:** ✅ k6 now correctly sends data to InfluxDB and Grafana visualizes it.
+**Main problem resolved:** ✅ k6 sends its metrics to InfluxDB, and Grafana visualizes them.
 
-**Pending problem:** ⚠️ Artillery still doesn't send data (requires additional configuration with plugins or Telegraf).
+**Artillery:** ✅ its metrics reach InfluxDB through Telegraf, with exact totals.
 
-**Project status:** 🟢 Functional for k6, 🟡 Partially functional for Artillery.
+**Project status:** 🟢 Functional for k6 and Artillery.
 
 ---
 
@@ -242,104 +272,69 @@ Artillery has plugins to send metrics:
 
 ### When to Use Production Mode
 
-Production mode (`docker-compose.prod.yml`) is designed for:
+Production mode (`docker-compose.prod.yml`) is the same stack as `docker-compose.yml`, with `restart: unless-stopped` on InfluxDB, Grafana, Telegraf and the toy API. It is meant for:
 
-- ✅ **High-scale load testing** with multiple concurrent test runners
-- ✅ **Soak/endurance tests** running for hours or days with auto-recovery
-- ✅ **Stress testing** to find system breaking points
-- ✅ **CI/CD pipeline integration** with automated restarts
+- ✅ **A lab that stays up** on a shared machine, coming back after a crash or a reboot
+- ✅ **Soak/endurance tests** running for hours or days, with the services restarted if they crash
+
+It starts with `npm run start:prod` (`docker compose -f docker-compose.prod.yml up -d --wait`) and reads the same `.env`. k6 and Artillery still run one container per test. See [PRODUCTION_MODE.md](PRODUCTION_MODE.md).
 
 ### Common Issues in Production Mode
 
-#### 1. **Container names conflict with development mode**
+#### 1. **Switching between development and production mode**
 
-**Problem:** Running production mode while development containers are still up causes conflicts.
+**Situation:** Both files belong to the same Compose project and share the `influxdb-data` volume.
 
-**Solution:**
+**Solution:** Stop the running stack before starting the other one:
 ```bash
 # Stop development mode first
-docker-compose down
+ltlab stop
 
 # Then start production mode
 npm run start:prod
 ```
 
-#### 2. **Replicas not scaling as expected**
+#### 2. **Auto-restart causing unexpected behavior**
 
-**Problem:** `deploy.replicas` doesn't work in standalone docker-compose (only in Swarm mode).
-
-**Solution:** Use `--scale` flag instead:
-```bash
-docker-compose -f docker-compose.prod.yml up -d --scale k6=5 --scale artillery=3
-```
-
-#### 3. **Load not distributing across replicas**
-
-**Symptom:** Multiple k6/Artillery instances running but load seems to come from only one.
+**Problem:** A container keeps restarting in a loop because of the `restart: unless-stopped` policy.
 
 **Diagnosis:**
 ```bash
-# Check all running instances
-docker-compose -f docker-compose.prod.yml ps
-
-# View logs from all replicas
-docker-compose -f docker-compose.prod.yml logs k6
-docker-compose -f docker-compose.prod.yml logs artillery
-```
-
-**Common causes:**
-- Test scenario not designed for distributed execution
-- Each replica runs the same test independently (this is expected behavior)
-- To distribute load, each instance should target the same endpoint
-
-#### 4. **Auto-restart causing unexpected behavior**
-
-**Problem:** Containers keep restarting in loops due to `restart: unless-stopped` policy.
-
-**Diagnosis:**
-```bash
-# Check restart count
-docker-compose -f docker-compose.prod.yml ps
+# Check which services are restarting
+docker compose -f docker-compose.prod.yml ps
 
 # View why containers are restarting
-docker-compose -f docker-compose.prod.yml logs --tail=50 <service_name>
+docker compose -f docker-compose.prod.yml logs --tail=50 <service_name>
 ```
 
-**Solution:** Fix underlying issues (missing dependencies, config errors) or temporarily stop:
+**Solution:** Fix the underlying issue (for example, a missing token or a configuration error in `.env`), or temporarily stop the service:
 ```bash
-docker-compose -f docker-compose.prod.yml stop <service_name>
+docker compose -f docker-compose.prod.yml stop <service_name>
 ```
 
-#### 5. **High resource usage with multiple replicas**
+#### 3. **High resource usage**
 
-**Symptom:** System becomes slow or unresponsive with many replicas running.
+**Symptom:** System becomes slow or unresponsive during long or heavy tests.
 
 **Monitoring:**
 ```bash
 # Check resource usage
 docker stats
 
-# Check specific service
-docker-compose -f docker-compose.prod.yml ps
+# Check the services
+docker compose -f docker-compose.prod.yml ps
 ```
 
-**Solution:** Reduce replicas or increase system resources:
-```bash
-# Scale down
-docker-compose -f docker-compose.prod.yml up -d --scale k6=2 --scale artillery=1
-```
+**Solution:** Reduce the virtual users or arrival rates of the scenario, or give Docker more resources.
 
 ### Production Mode Best Practices
 
-1. **Monitor resource usage** before scaling up
-2. **Start with low replicas** (2-3) and scale gradually
-3. **Use development mode for debugging** - it's easier to troubleshoot with single instances
+1. **Create `.env` with `ltlab configure`** before the first `npm run start:prod`
+2. **Monitor resource usage** during long tests
+3. **Use development mode for day-to-day work** - the `ltlab` commands work with `docker-compose.yml`
 4. **Check logs regularly** when running long soak tests
-5. **Plan capacity** - each k6/Artillery replica needs CPU and memory
-6. **Clean up after tests** - `npm run stop:prod` to free resources
+5. **Clean up after tests** - `npm run stop:prod` to free resources
 
 ---
 
-**Last updated:** January 29, 2026  
-**Version:** 1.1  
 **Maintained by:** David Estevez

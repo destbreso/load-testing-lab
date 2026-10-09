@@ -20,7 +20,7 @@ Complete installation and configuration guide for the Load Testing Lab.
 ### Required Software
 
 - **Docker** >= 24.0 ([Install Docker](https://docs.docker.com/get-docker/))
-- **Docker Compose** >= 2.18 (included with Docker Desktop)
+- **Docker Compose** v2 (included with Docker Desktop; on Linux, the Compose plugin or a standalone `docker-compose` v2 binary)
 - **Node.js** >= 22.13 ([Install Node.js](https://nodejs.org/))
 - **Git** (for cloning repository)
 
@@ -35,9 +35,11 @@ Complete installation and configuration guide for the Load Testing Lab.
 
 ```bash
 docker --version          # Should show >= 24.0
-docker-compose --version  # Should show >= 2.18
-node --version           # Should show >= 22.13
+docker compose version    # Should show v2 or later
+node --version            # Should show >= 22.13
 ```
+
+The CLI runs `docker compose` when the Compose plugin is installed, and a standalone `docker-compose` binary otherwise, as long as it is v2 or later. With Compose v1 only, the commands that use Compose stop with "Docker Compose v2 was not found".
 
 ---
 
@@ -53,55 +55,64 @@ cd load-testing-lab
 ### 2. Install Dependencies
 
 ```bash
-npm install
+npm install && npm link
 ```
 
-This installs the CLI and helper scripts.
+This installs the CLI's dependencies and links the global `ltlab` command. Every `ltlab` command then works from any directory and reads the lab's own `.env`, never the `.env` of the directory you run it from.
 
-### 3. Start Services
+Without `npm link`, run the CLI from the lab's folder with `npm run cli -- <command>` (or the shortcuts `npm start`, `npm stop`, `npm run configure`).
+
+### 3. Configure the Lab
+
+```bash
+ltlab configure
+```
+
+The wizard writes the lab's `.env` and generates the InfluxDB token. Its defaults work with the built-in toy API. See [Configuration](#configuration).
+
+### 4. Start Services
 
 **Option A: Using CLI (Recommended)**
 
 ```bash
 # Start all services
-npm start
-
-# Or with global ltlab command
-npm link
 ltlab start
+
+# Or via npm script (from the lab's folder)
+npm start
 ```
+
+`ltlab start` builds the k6 and Artillery images (a few minutes the first time, cached afterwards), starts InfluxDB, Telegraf, Grafana and the toy API, and returns once every service is ready (health checks). It then prints the URLs, with the ports from `.env`, the commands to run a test, and the names of the built-in scenarios. Without a `.env`, or without `INFLUXDB_TOKEN` in it, it stops and asks you to run `ltlab configure`.
 
 **Option B: Direct Docker**
 
-```bash
-docker-compose up -d
-```
-
-### 4. Wait for Initialization
-
-Services need 5-10 seconds to initialize:
+From the lab's folder, with the `.env` from step 3:
 
 ```bash
-# Check status
-docker-compose ps
-
-# Wait for healthy status
-docker-compose logs influxdb | grep "Started HTTP"
+docker compose build k6 artillery
+docker compose up -d --wait
 ```
+
+`--wait` returns once every service passes its health check. The k6 and Artillery services belong to the Compose profile `runners`: `up` never starts them, they run only for a test (`docker compose run --rm k6 run /k6/scenarios/toy-fast.js`).
 
 ### 5. Verify Installation
 
 ```bash
-# Check all services are running
-docker-compose ps
+# Configuration and service health, from any directory
+ltlab info
 
-# Expected output:
-# NAME          SERVICE    STATUS    PORTS
-# influxdb      influxdb   Up        0.0.0.0:8086->8086/tcp
-# grafana       grafana    Up        0.0.0.0:3000->3000/tcp
-# toy-api       toy-api    Up        0.0.0.0:5000->5000/tcp
-# telegraf      telegraf   Up        8092/udp, 8094/tcp, 8125/udp
+# Or, from the lab's folder
+docker compose ps
+
+# Expected (abridged): four services, three of them with a health check
+# SERVICE    STATUS
+# grafana    Up (healthy)
+# influxdb   Up (healthy)
+# telegraf   Up
+# toy-api    Up (healthy)
 ```
+
+Containers are named `<project>-<service>-1` (for example `load-testing-lab-influxdb-1`). Use the service names with Compose: `docker compose logs telegraf`, `docker compose exec influxdb influx ping`.
 
 ---
 
@@ -109,34 +120,40 @@ docker-compose ps
 
 ### Environment Variables
 
-The lab uses a `.env` file for configuration. Create it from the template:
-
-```bash
-cp .env.example .env
-```
+The lab uses a `.env` file at its root. `ltlab configure` creates it, readable only by you (mode 0600), and updates it later, wherever you run the command from.
 
 ### Key Configuration Options
 
 ```env
-# InfluxDB Configuration
-INFLUXDB_ORG=myorg
-INFLUXDB_BUCKET=loadtests
-INFLUXDB_TOKEN=your-generated-token-here
-INFLUXDB_ADMIN_USER=admin
-INFLUXDB_ADMIN_PASSWORD=admin123
-
-# Target API (change for different test targets)
+# Target API, as the containers see it (the lab's toy API by default)
 TARGET_API_URL=http://toy-api:5000
 
-# k6 Test Configuration
-CONCURRENCY=50          # Virtual users
-DURATION=30s           # Test duration
-RAMP_UP=10s            # Ramp-up time
+# InfluxDB token, generated by ltlab configure (64 hex characters)
+INFLUXDB_TOKEN=<generated>
 
-# Grafana Configuration
+# InfluxDB setup, applied on its first start
+INFLUXDB_ORG=myorg
+INFLUXDB_BUCKET=loadtests
+INFLUXDB_USER=admin
+INFLUXDB_PASSWORD=admin123
+
+# Grafana admin, applied on every start
+GRAFANA_USER=admin
+GRAFANA_PASSWORD=admin123
+
+# Virtual users and duration of toy-fast.js
+CONCURRENCY=50
+DURATION=60s
+
+# Optional: ports on your machine (defaults shown)
 GRAFANA_PORT=3000
-GRAFANA_ADMIN_PASSWORD=admin123
+INFLUXDB_PORT_EXPORT=8086
+TOY_API_PORT=5000
 ```
+
+The scripts that run on your machine (`ltlab reset`, `ltlab metrics`, `npm run check-influx`, `npm run tail-influx`) reach InfluxDB at `http://localhost:<INFLUXDB_PORT_EXPORT>` (8086 by default), so moving InfluxDB's port needs no other change. `INFLUXDB_URL` is optional: set it only to point those scripts at an InfluxDB that runs somewhere else. `ltlab info` shows the address in effect.
+
+InfluxDB reads `INFLUXDB_TOKEN`, `INFLUXDB_ORG`, `INFLUXDB_BUCKET`, `INFLUXDB_USER` and `INFLUXDB_PASSWORD` only when it sets itself up, on its first start, and keeps that setup on the `influxdb-data` volume. Changing one of them later does not change InfluxDB; for the token, the organization and the bucket, k6, Telegraf and Grafana would then use values InfluxDB does not know (see [Token Management](#token-management)). `ltlab purge` followed by `ltlab start` sets InfluxDB up again from `.env`, deleting the stored metrics.
 
 ### Interactive Configuration
 
@@ -146,15 +163,16 @@ Use the CLI wizard for guided setup:
 # Interactive configuration
 ltlab configure
 
-# Or via npm script
+# Or via npm script (from the lab's folder)
 npm run configure
 ```
 
 The wizard will:
-1. Create `.env` if it doesn't exist
-2. Generate InfluxDB token
-3. Configure Grafana datasource
-4. Validate connectivity
+1. Ask for each setting, offering the value already in `.env` or the default (the InfluxDB password needs at least 8 characters)
+2. Keep the values already there, and any other key, such as the ports or an `INFLUXDB_URL` for an InfluxDB elsewhere (a local one, `http://localhost:<port>` or `http://influxdb:8086`, is dropped, since the scripts derive the local address from the port)
+3. Generate `INFLUXDB_TOKEN` when there is none, and keep an existing one
+
+Running services pick up a change with `ltlab restart -s all`. k6 and Artillery read `.env` on every run.
 
 ---
 
@@ -166,11 +184,14 @@ For local testing and development:
 
 ```bash
 # Start with docker-compose.yml
-docker-compose up -d
+ltlab start
+
+# Same stack without the CLI (from the lab's folder)
+docker compose up -d --wait
 
 # Single instance of each service
-# Logs visible for debugging
-# Manual restart required
+# Logs visible for debugging (docker compose logs <service>)
+# InfluxDB, Grafana and the toy API do not restart on their own after a crash
 ```
 
 **Use cases:**
@@ -181,27 +202,23 @@ docker-compose up -d
 
 ### Production Mode
 
-For high-scale testing and CI/CD:
+For long-running tests and a lab that stays up:
 
 ```bash
 # Start with docker-compose.prod.yml
-docker-compose -f docker-compose.prod.yml up -d --scale k6=5 --scale artillery=3
+docker compose -f docker-compose.prod.yml up -d --wait
 
 # Or via npm script
 npm run start:prod
 ```
 
 **Features:**
-- ✅ Auto-restart on failure
-- ✅ Multiple replicas for load distribution
-- ✅ Resource limits configured
-- ✅ Optimized for long-running tests
+- ✅ The same stack as development mode
+- ✅ InfluxDB, Grafana, Telegraf and the toy API restart automatically (`restart: unless-stopped`), after a crash or a reboot of the host
 
 **Use cases:**
-- ✅ Stress testing
 - ✅ Soak testing (hours/days)
-- ✅ CI/CD pipelines
-- ✅ Distributed load generation
+- ✅ A lab that stays up on a shared machine
 
 See [PRODUCTION_MODE.md](PRODUCTION_MODE.md) for complete guide.
 
@@ -209,67 +226,38 @@ See [PRODUCTION_MODE.md](PRODUCTION_MODE.md) for complete guide.
 
 ## Token Management
 
-### Why Tokens Are Needed
+### How the Token Works
 
-InfluxDB v2 uses tokens for authentication. The lab requires a token for:
-- k6 to send metrics to InfluxDB
-- Artillery (via Telegraf) to send metrics
-- Grafana to read metrics for visualization
+InfluxDB v2 uses tokens for authentication. The lab uses a single token, `INFLUXDB_TOKEN` in `.env`:
 
-### Automatic Token Generation
+- `ltlab configure` generates it (64 hex characters) when `.env` has none, and keeps an existing one
+- On its first start, InfluxDB adopts it as its admin token
+- k6 uses it to send metrics, Telegraf to write Artillery's metrics, and Grafana to read them; each one receives it from `.env` through the compose file
+- Grafana's datasource (`grafana/provisioning/datasources/influxdb.yaml`) reads `${INFLUXDB_TOKEN}`, `${INFLUXDB_ORG}` and `${INFLUXDB_BUCKET}` from Grafana's environment, so the token lives only in `.env`, never in the repository
 
-The easiest method is using the provided script:
-
-```bash
-# Generate and display token
-node scripts/generate-influx-token.js
-
-# Auto-update .env file
-node scripts/generate-influx-token.js --update-env
-```
-
-### Manual Token Generation
-
-```bash
-# Inside InfluxDB container
-docker exec -it influxdb influx auth create \
-  --read-buckets \
-  --write-buckets \
-  --org myorg \
-  --description "Load Testing Token"
-
-# Copy the token and update .env
-```
+Nothing needs to be generated or copied by hand.
 
 ### Token Validation
 
 Verify your token works:
 
 ```bash
-# Check token connectivity
-node scripts/check-influx-token.js
+# From the lab's folder
+npm run check-influx
 
 # Expected output:
-# ✅ InfluxDB Connection: OK
-# ✅ Token Valid: yes
-# ✅ Bucket 'loadtests' exists: yes
-# ✅ Organization 'myorg' exists: yes
+# ✅ Token works! Buckets in org:
+# - loadtests (ID: ...)
+# (InfluxDB's own system buckets are listed too)
 ```
 
-### Synchronizing Grafana
+### When the Token Does Not Match
 
-After generating a new token, update Grafana:
+InfluxDB reads `INFLUXDB_TOKEN` only when it sets itself up, on its first start. If `.env` later holds a different token (edited by hand, or generated again by `ltlab configure` after `.env` was deleted, while the `influxdb-data` volume keeps the old setup), k6, Telegraf and Grafana get `401 Unauthorized`. Any of these fixes it:
 
-1. Edit `grafana/provisioning/datasources/influxdb.yaml`
-2. Replace token in `secureJsonData.token` field
-3. Restart Grafana:
-
-```bash
-docker-compose restart grafana
-
-# Or via CLI
-ltlab restart -s grafana
-```
+- Put back in `.env` the token InfluxDB was set up with, then run `ltlab restart -s all`
+- Run `ltlab purge`, then `ltlab start`: InfluxDB sets itself up again with the token in `.env` (the stored metrics are deleted)
+- Create an all-access token in InfluxDB's UI (http://localhost:8086, logging in with the admin user and password it was set up with), set it as `INFLUXDB_TOKEN` in `.env`, then run `ltlab restart -s all`
 
 ---
 
@@ -288,33 +276,24 @@ TARGET_API_URL=http://toy-api:5000
 To test external APIs (production, staging, internet):
 
 ```bash
-# External domain
-export TARGET_API_URL=https://api.example.com
+# Set it in the lab's .env: ltlab configure asks for it (or edit TARGET_API_URL)
+ltlab configure
 
-# Or update .env
-echo "TARGET_API_URL=https://api.example.com" >> .env
-
-# Run test
-ltlab k6 -s toy-fast.js
+# Or for a single run
+ltlab k6 -s ./load-tests/smoke.js -e TARGET_API_URL=https://api.example.com
 ```
+
+k6 and Artillery start a new container for every test, which reads `.env` at that moment, so a new `TARGET_API_URL` applies to the next test without restarting anything.
 
 ### Testing Host Machine APIs
 
-When your API runs on `localhost` outside Docker:
+When your API runs on `localhost` outside Docker, use `host.docker.internal` on macOS, Windows and Linux alike (the k6 and Artillery containers map it to your machine):
 
-**macOS / Windows:**
 ```env
 TARGET_API_URL=http://host.docker.internal:3031
 ```
 
-**Linux:**
-```env
-# Option 1: Use host gateway (Docker 20.10+)
-TARGET_API_URL=http://host.gateway:3031
-
-# Option 2: Use actual host IP
-TARGET_API_URL=http://192.168.1.100:3031
-```
+On Linux, the API must listen on `0.0.0.0` (not only on `127.0.0.1`) for the containers to reach it.
 
 **Why?** Inside Docker containers, `localhost` refers to the container itself, not your host machine.
 
@@ -326,7 +305,7 @@ TARGET_API_URL=http://192.168.1.100:3031
 | External domain | `https://api.example.com` |
 | External IP | `http://52.123.45.67:8080` |
 | Host machine (Mac/Win) | `http://host.docker.internal:3031` |
-| Host machine (Linux) | `http://192.168.1.100:3031` |
+| Host machine (Linux) | `http://host.docker.internal:3031` (API listening on `0.0.0.0`) |
 
 ---
 
@@ -334,46 +313,39 @@ TARGET_API_URL=http://192.168.1.100:3031
 
 ### When to Use
 
-- High-scale load testing (1000+ VUs)
-- Long-running soak tests (hours/days)
-- Stress testing to find breaking points
-- CI/CD pipeline integration
+- Long-running soak tests (hours/days), where a service that crashes should come back on its own
+- A lab that stays up on a shared machine and starts again after a reboot of the host
 
 ### Configuration
 
 ```bash
-# Scale services
-docker-compose -f docker-compose.prod.yml up -d \
-  --scale k6=5 \
-  --scale artillery=3
+# Start (returns once every service is ready)
+docker compose -f docker-compose.prod.yml up -d --wait
 
 # Or via npm
-npm run start:prod -- --scale k6=5
+npm run start:prod
+
+# Stop
+npm run stop:prod
 ```
 
 ### Best Practices
 
-1. **Start with low replicas** (2-3) and scale gradually
-2. **Monitor resources** with `docker stats`
-3. **Use development mode for debugging** (easier to troubleshoot)
-4. **Check logs regularly** during long tests
-5. **Clean up after tests** with `npm run stop:prod`
+1. **Monitor resources** with `docker stats`
+2. **Use development mode for debugging** (easier to troubleshoot)
+3. **Check logs regularly** during long tests: `docker compose -f docker-compose.prod.yml logs -f`
+4. **Clean up after tests** with `npm run stop:prod`
 
 ### Common Issues
 
-**Problem:** Container name conflicts
+**Problem:** A service keeps restarting
 
 ```bash
-# Solution: Stop dev mode first
-docker-compose down
-npm run start:prod
-```
+# See why it stops
+docker compose -f docker-compose.prod.yml logs --tail=50 influxdb
 
-**Problem:** High CPU/memory usage
-
-```bash
-# Solution: Reduce replicas
-docker-compose -f docker-compose.prod.yml up -d --scale k6=2
+# Fix the cause (often a value in .env), then start again
+docker compose -f docker-compose.prod.yml up -d --wait
 ```
 
 See [PRODUCTION_MODE.md](PRODUCTION_MODE.md) for troubleshooting guide.
@@ -385,10 +357,14 @@ See [PRODUCTION_MODE.md](PRODUCTION_MODE.md) for troubleshooting guide.
 ### 1. Check Services
 
 ```bash
-# All services running
-docker-compose ps
+# All services running and healthy
+ltlab info
+
+# Or, from the lab's folder
+docker compose ps
 
 # Should show 4 services: influxdb, grafana, toy-api, telegraf
+# (k6 and Artillery appear only while a test runs)
 ```
 
 ### 2. Test InfluxDB
@@ -397,7 +373,7 @@ docker-compose ps
 # Open InfluxDB UI
 open http://localhost:8086
 
-# Login: admin / admin123
+# Login: admin / admin123 (INFLUXDB_USER / INFLUXDB_PASSWORD)
 # Verify bucket 'loadtests' exists
 ```
 
@@ -407,28 +383,28 @@ open http://localhost:8086
 # Open Grafana
 open http://localhost:3000
 
-# Login: admin / admin123
-# Navigate to Dashboards → Browse
-# Should see 6 dashboards (3 k6 + 3 Artillery)
+# Login: admin / admin123 (GRAFANA_USER / GRAFANA_PASSWORD)
+# Navigate to Dashboards
+# Should see 6 dashboards (3 k6 + 3 Artillery) in the General folder
 ```
 
 ### 4. Run Test
 
 ```bash
 # Quick k6 test
-docker-compose run --rm k6 run /k6/scenarios/toy-fast.js
+ltlab k6 -s toy-fast.js
 
 # Expected output:
 # ✅ K6 InfluxDB configured
 # ✅ output: InfluxDBv2 (http://influxdb:8086)
-# ✅ Test completes with metrics
+# ✅ Test completes with metrics, every threshold passes, and the CLI prints "k6 test completed!" (exit code 0)
 ```
 
 ### 5. Verify Metrics in Grafana
 
 1. Open Grafana: http://localhost:3000
-2. Go to "k6 - Basic (War Room)" dashboard
-3. Adjust time range to "Last 15 minutes"
+2. Go to the "k6 Load Testing - War Room" dashboard
+3. The dashboards show the last 30 minutes and refresh every 5 seconds; widen the time range for an older run
 4. Should see metrics from your test
 
 ---
@@ -449,8 +425,4 @@ If you encounter issues during setup, see:
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common problems and solutions
 - **[DIAGNOSIS_AND_SOLUTION.md](DIAGNOSIS_AND_SOLUTION.md)** - Technical deep dive
 - **[Blog: Getting Started Guide](https://destbreso.com/blog/load-testing-lab-getting-started)** - Step-by-step tutorial with examples
-- **[Blog: Architecture Overview](https://destbreso.com/blog/performance-engineering-validation-capacity-resilience)** - Strategic approaches to setup
-
----
-
-**Last Updated:** January 29, 2026
+- **[Blog: Architecture Overview](https://destbreso.com/blog/load-testing-lab-architecture)** - How the stack is built, and why

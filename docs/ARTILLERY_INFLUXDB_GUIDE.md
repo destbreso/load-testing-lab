@@ -1,30 +1,35 @@
-# Guide: Integrating Artillery with InfluxDB v2
+# Guide: Artillery Metrics in InfluxDB v2
 
-**This integration is already implemented in the project.**
+Artillery has no InfluxDB v2 output of its own. In the lab, Artillery's built-in **publish-metrics** plugin sends its metrics over StatsD to **Telegraf**, and Telegraf writes them to **InfluxDB v2**, where the Artillery dashboards read them:
 
-Artillery sends metrics to InfluxDB v2 automatically using the following architecture:
-
-**Artillery** → (StatsD) → **Telegraf** → **InfluxDB v2** → **Grafana**
+**Artillery** (publish-metrics) → (StatsD, UDP 8125) → **Telegraf** → **InfluxDB v2** → **Grafana**
 
 ### Current Status
 
-✅ **Telegraf configured** in `docker-compose.yml` and `telegraf/telegraf.conf`  
-✅ **Artillery Dockerfile** includes `artillery-plugin-statsd`  
-✅ **Scenarios updated** with automatic StatsD configuration  
-✅ **Grafana Dashboard** provisioned (`artillery-telegraf.json`)  
-✅ **Metrics working** without manual configuration
+✅ **Telegraf** runs as a lab service (`docker-compose.yml`, UDP port 8125), configured by `telegraf/telegraf.conf`  
+✅ **Artillery image** installs `artillery@2.0.34`; publish-metrics is bundled with Artillery, so there is no separate plugin to install  
+✅ **Every built-in scenario and blueprint** has the publish-metrics block  
+✅ **Three Artillery dashboards** are provisioned: `artillery-telegraf`, `artillery-pro`, `artillery-elite`  
+✅ **Totals match Artillery's summary**: counters such as requests and status codes reach InfluxDB exactly
 
 ### Quick Usage
 
 ```bash
-# 1. Ensure Telegraf is running
-docker-compose up -d telegraf
+# 1. Start the lab (Telegraf included); returns when every service is ready
+ltlab start
 
-# 2. Run Artillery test
-docker-compose run --rm artillery run /artillery/scenarios/toy-fast.yml
+# 2. Run an Artillery scenario
+ltlab artillery -s toy-fast.yml
 
-# 3. View metrics in Grafana
-# Dashboard: "Artillery + Telegraf - Real-time Metrics"
+# 3. Open the dashboard "Artillery + Telegraf - War Room"
+open http://localhost:3000/d/artillery-telegraf
+```
+
+The same steps with Docker Compose, from the lab's root directory:
+
+```bash
+docker compose up -d --wait
+docker compose run --rm artillery run /artillery/scenarios/toy-fast.yml
 ```
 
 ---
@@ -34,383 +39,243 @@ docker-compose run --rm artillery run /artillery/scenarios/toy-fast.yml
 ### Data Flow
 
 ```
-Artillery Test
-    ↓ (StatsD Protocol - UDP 8125)
-Telegraf (inputs.statsd)
-    ↓ (InfluxDB v2 Line Protocol)
-InfluxDB v2 (bucket: loadtests)
-    ↓ (Flux Queries)
-Grafana (Dashboard)
+Artillery test (publish-metrics plugin, type statsd, prefix "artillery.")
+    ↓ StatsD over UDP, telegraf:8125
+Telegraf (inputs.statsd, collected every second, templates turn names into measurements and fields)
+    ↓ InfluxDB v2 write API, flushed every 10 seconds
+InfluxDB v2 (bucket from INFLUXDB_BUCKET, default loadtests)
+    ↓ Flux queries
+Grafana (Artillery dashboards)
 ```
 
 ### Components
 
-1. **Artillery + artillery-plugin-statsd**: Generates metrics and sends via StatsD
-2. **Telegraf**: Receives StatsD, aggregates, and sends to InfluxDB v2
-3. **InfluxDB v2**: Stores time series
-4. **Grafana**: Visualizes with Flux queries
+1. **Artillery + publish-metrics**: reports its metrics every 10 seconds and sends them over StatsD
+2. **Telegraf**: receives StatsD, names the measurements and fields, and writes to InfluxDB v2
+3. **InfluxDB v2**: stores the time series
+4. **Grafana**: reads them with Flux queries
 
 ---
 
-## Original Problem
+## Step 1: Artillery Sends Its Metrics
 
-Artillery has no native support for InfluxDB v2. To send Artillery metrics to InfluxDB, you need to implement one of the following solutions.
-
----
-
-## Solution 1: Use Telegraf (Recommended) ⭐
-
-Telegraf acts as an intermediary that receives Artillery metrics via StatsD and sends them to InfluxDB v2.
-
-### Step 1: Add Telegraf to docker-compose.yml
+Each scenario turns the plugin on in its `config`:
 
 ```yaml
-services:
-  # ... existing services ...
-  
-  telegraf:
-    image: telegraf:1.28-alpine
-    container_name: telegraf
-    volumes:
-      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
-    ports:
-      - "8125:8125/udp"  # StatsD
-    depends_on:
-      - influxdb
-    networks:
-      - ltl-net
-    environment:
-      - INFLUXDB_URL=http://influxdb:8086
-      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
-      - INFLUXDB_ORG=${INFLUXDB_ORG}
-      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET}
+config:
+  target: "{{ $processEnvironment.TARGET_API_URL }}"
+  phases:
+    - duration: 30
+      arrivalRate: 50
+  plugins:
+    publish-metrics:
+      - type: statsd
+        host: "{{ $processEnvironment.STATSD_HOST }}"
+        port: "{{ $processEnvironment.STATSD_PORT }}"
+        prefix: "artillery."
 ```
 
-### Step 2: Create telegraf/telegraf.conf
+`STATSD_HOST=telegraf` and `STATSD_PORT=8125` are set on the `artillery` service in `docker-compose.yml`, and every built-in scenario and blueprint, the chaos scenarios included, reads them this way.
+
+Every 10 seconds Artillery reports the period that just ended, and the plugin sends:
+
+- **Counters** as StatsD counters: `http.requests`, `http.responses`, `http.downloaded_bytes`, `http.codes.<status>`, `vusers.created`, `vusers.completed`, `vusers.failed`, `vusers.created_by_name.<scenario>`, `errors.<code>`
+- **Rates** as gauges: `http.request_rate`
+- **Summaries** as one gauge per statistic (`min`, `max`, `mean`, `median`, `p50`, `p75`, `p90`, `p95`, `p99`, `p999`, `count`): `http.response_time`, its split by status class (`http.response_time.2xx`, `.4xx`, `.5xx`), and `vusers.session_length`
+
+Every name carries the prefix `artillery.`, which Telegraf's templates and the dashboards expect. Before Artillery exits, the plugin flushes what it has not sent yet, so the last period of the run (usually a partial one) arrives too.
+
+### Scenario names without spaces
+
+A scenario's name becomes part of a metric name (`vusers.created_by_name.<name>`), and StatsD cuts a name at its first space. Give scenarios names without spaces; the lab's own use kebab-case (`mixed-chaos-scenario`, `error-resilience`, `everything-goes-wrong`, `rapid-fire-chaos`, `retry-logic-testing`, `mixed-reliability`).
+
+---
+
+## Step 2: Telegraf Receives StatsD and Writes to InfluxDB
+
+The StatsD input in `telegraf/telegraf.conf` (excerpt, without its comments):
 
 ```toml
-# telegraf/telegraf.conf
-
-[agent]
-  interval = "10s"
-  round_interval = true
-  metric_batch_size = 1000
-  metric_buffer_limit = 10000
-  collection_jitter = "0s"
-  flush_interval = "10s"
-  flush_jitter = "0s"
-  precision = ""
-
-# Input: StatsD (receives Artillery metrics)
 [[inputs.statsd]]
+  interval = "1s"
   protocol = "udp"
   service_address = ":8125"
   delete_gauges = true
   delete_counters = true
   delete_sets = true
   delete_timings = true
-  percentiles = [50, 90, 95, 99]
-  metric_separator = "."
-  parse_data_dog_tags = false
-  datadog_extensions = false
+  metric_separator = "_"
   allowed_pending_messages = 10000
-  percentile_limit = 1000
 
-# Output: InfluxDB v2
-[[outputs.influxdb_v2]]
-  urls = ["${INFLUXDB_URL}"]
-  token = "${INFLUXDB_TOKEN}"
-  organization = "${INFLUXDB_ORG}"
-  bucket = "${INFLUXDB_BUCKET}"
-  timeout = "5s"
-  user_agent = "telegraf"
-  
-  # Additional tags to identify Artillery data
-  [outputs.influxdb_v2.tagpass]
-    source = ["artillery"]
+  namedrop = ["artillery_plugins"]
+
+  templates = [
+    "artillery.http.response_time.*.* measurement.measurement.measurement.class.field",
+    "artillery.http.response_time.* measurement.measurement.measurement.field",
+    "artillery.vusers.session_length.* measurement.measurement.measurement.field",
+    "artillery.http.codes.* measurement.measurement.measurement.field",
+    "artillery.vusers.created_by_name.* measurement.measurement.measurement.field*",
+    "artillery.errors.* measurement.measurement.field*",
+    "artillery.plugins.* measurement.measurement.field*",
+    "artillery.* measurement.field*"
+  ]
 ```
 
-### Step 3: Configure Artillery to use StatsD
+What each setting does:
 
-Update your Artillery scenarios (e.g., `artillery/scenarios/toy-fast.yml`):
+- **`interval = "1s"`**: the agent collects every 10 seconds, but the StatsD input collects every second. Artillery reports every 10 seconds, so each report lands in its own collection. Gauges keep only the last value of a collection, so two reports inside one collection would keep only the second.
+- **`delete_* = true`**: every collection starts from zero, so a row holds only what arrived during that second. Counter increments that arrive within the same second are added together.
+- **`templates`**: they decide which parts of a name form the measurement, the field and the `class` tag; parts are joined with `_` (`metric_separator`). `artillery.http.response_time.p95` becomes field `p95` of measurement `artillery_http_response_time`; `artillery.http.response_time.2xx.p95` becomes the same field with the tag `class=2xx`; `artillery.http.requests` becomes field `http_requests` of measurement `artillery`.
+- **`namedrop = ["artillery_plugins"]`**: Artillery enables its metrics-by-endpoint plugin by default and reports per-endpoint metrics under `plugins.`, one series per URL and without bound for URLs that carry IDs, so they are not stored. The `expect` plugin's counters live there too.
 
-```yaml
-config:
-  target: "{{ $processEnvironment.TARGET_API_URL }}"
-  phases:
-    - duration: 30
-      arrivalRate: 50
-  
-  # Add StatsD plugin
-  plugins:
-    statsd:
-      host: telegraf  # service name in Docker
-      port: 8125
-      prefix: "artillery"
-      
-  # Custom metrics to send
-  ensure:
-    maxErrorRate: 1  # maximum 1% errors
-    
-scenarios:
-  - flow:
-      - get:
-          url: "/fast"
-```
-
-### Step 4: Install StatsD plugin in Artillery
-
-Actualiza `artillery/Dockerfile`:
-
-```dockerfile
-FROM node:20-alpine
-
-RUN npm install -g artillery artillery-plugin-statsd
-
-WORKDIR /artillery
-
-ENTRYPOINT ["artillery"]
-```
-
-### Step 5: Rebuild and test
-
-```bash
-# Rebuild Artillery with plugin
-docker-compose build artillery
-
-# Start all services including Telegraf
-docker-compose up -d
-
-# Run an Artillery test
-docker-compose run --rm artillery run /artillery/scenarios/toy-fast.yml
-```
+The output writes to `http://influxdb:8086`, the address the compose file gives Telegraf, with the token, organization and bucket that Compose passes from `.env` (`INFLUXDB_TOKEN`, `INFLUXDB_ORG`, `INFLUXDB_BUCKET`), and flushes every 10 seconds (`flush_interval`).
 
 ---
 
-## Solution 2: Custom Artillery Plugin
+## Resulting Schema
 
-If you prefer not to use Telegraf, you can create a custom Artillery plugin that sends directly to InfluxDB v2.
+| Measurement                        | Fields                                                                                                                                             | Notes                                                                                    |
+|------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------|
+| `artillery`                        | Counters `http_requests`, `http_responses`, `http_downloaded_bytes`, `vusers_created`, `vusers_completed`, `vusers_failed`; gauge `http_request_rate` | Request and virtual user counts per report                                               |
+| `artillery_http_codes`             | One counter field per status code: `"200"`, `"404"`, `"500"`, ...                                                                                  | Responses per status code                                                                |
+| `artillery_http_response_time`     | `min`, `max`, `mean`, `median`, `p50`, `p75`, `p90`, `p95`, `p99`, `p999`, `count`                                                                 | One row per 10-second period. The overall series has no `class` tag; series tagged `class=2xx`, `4xx` or `5xx` cover one status class |
+| `artillery_vusers_session_length`  | Same statistics                                                                                                                                    | How long virtual users took to finish their scenario                                     |
+| `artillery_vusers_created_by_name` | One counter field per scenario name                                                                                                                | Virtual users started per scenario; an unnamed scenario appears as its position (`0`, `1`, ...) |
+| `artillery_errors`                 | One counter field per error code                                                                                                                   | Present only when Artillery reported errors                                              |
 
-### Step 1: Create the plugin
+Every row also has the tags `metric_type` (`counter` or `gauge`) and `host=telegraf`.
 
-Create `artillery/plugins/influxdb-v2-plugin.js`:
+### Why the totals are exact
 
-```javascript
-const { InfluxDB, Point } = require('@influxdata/influxdb-client');
+Artillery sends each period's counts as StatsD counters, Telegraf adds what arrives within a second and starts again from zero, and nothing is overwritten. Summing a counter field over a time range therefore gives the exact total: the sum of `http_requests` equals `http.requests` in Artillery's end-of-test summary, and the sums in `artillery_http_codes` equal its `http.codes.*` lines.
 
-module.exports = {
-  Plugin: InfluxDBv2Plugin
-};
+### Why percentiles are per period
 
-function InfluxDBv2Plugin(script, events) {
-  const influxUrl = process.env.INFLUXDB_URL || 'http://influxdb:8086';
-  const token = process.env.INFLUXDB_TOKEN;
-  const org = process.env.INFLUXDB_ORG || 'myorg';
-  const bucket = process.env.INFLUXDB_BUCKET || 'loadtests';
+Artillery sends percentiles already computed for each 10-second period. Percentiles of different periods cannot be added or averaged into a percentile of the whole run, so the dashboards chart each period's value over time, and their stats titled **"pXX, worst report"** show the highest value among the periods in the selected range. That value is an upper bound on the run's percentile. The exact percentile for the whole run is in Artillery's end-of-test summary.
 
-  const client = new InfluxDB({ url: influxUrl, token });
-  const writeApi = client.getWriteApi(org, bucket);
-  writeApi.useDefaultTags({ source: 'artillery' });
+### Why the last period arrives, and when
 
-  // Send metrics when requests complete
-  events.on('stats', (stats) => {
-    const timestamp = Date.now();
-    
-    // Latency
-    if (stats.latency) {
-      const point = new Point('http_req_duration')
-        .floatField('min', stats.latency.min)
-        .floatField('max', stats.latency.max)
-        .floatField('median', stats.latency.median)
-        .floatField('p95', stats.latency.p95)
-        .floatField('p99', stats.latency.p99)
-        .timestamp(timestamp);
-      writeApi.writePoint(point);
-    }
-
-    // Requests
-    if (stats.codes) {
-      Object.keys(stats.codes).forEach(code => {
-        const point = new Point('http_requests')
-          .tag('status_code', code)
-          .intField('count', stats.codes[code])
-          .timestamp(timestamp);
-        writeApi.writePoint(point);
-      });
-    }
-
-    // Errors
-    if (stats.errors) {
-      const point = new Point('errors')
-        .intField('count', Object.keys(stats.errors).length)
-        .timestamp(timestamp);
-      writeApi.writePoint(point);
-    }
-
-    // Flush data
-    writeApi.flush();
-  });
-
-  // Close connection when done
-  events.on('done', async () => {
-    try {
-      await writeApi.close();
-    } catch (err) {
-      console.error('Error closing InfluxDB connection:', err);
-    }
-  });
-}
-```
-
-### Step 2: Install dependencies
-
-Update `artillery/Dockerfile`:
-
-```dockerfile
-FROM node:20-alpine
-
-RUN npm install -g artillery
-RUN npm install -g @influxdata/influxdb-client
-
-WORKDIR /artillery
-
-ENTRYPOINT ["artillery"]
-```
-
-### Step 3: Use plugin in scenarios
-
-```yaml
-config:
-  target: "{{ $processEnvironment.TARGET_API_URL }}"
-  phases:
-    - duration: 30
-      arrivalRate: 50
-  
-  # Reference custom plugin
-  plugins:
-    influxdb-v2-plugin:
-      path: "/artillery/plugins/influxdb-v2-plugin.js"
-
-scenarios:
-  - flow:
-      - get:
-          url: "/fast"
-```
+The plugin flushes before Artillery exits, so the final report reaches Telegraf; Telegraf, which keeps running, collects it within a second and writes it at its next flush. Artillery reports every 10 seconds and Telegraf flushes every 10 seconds, so Artillery panels trail the run by up to about 20 seconds.
 
 ---
 
-## Solution 3: Post-Processing Script (Simpler but less real-time)
+## Example Flux Queries
 
-You can have Artillery save JSON reports and then process them to send to InfluxDB.
+### In Grafana
 
-### Step 1: Run Artillery with JSON output
+The lab's InfluxDB datasource sets `v.defaultBucket` from `INFLUXDB_BUCKET`, so panels never name the bucket.
 
-```bash
-docker-compose run --rm artillery run \
-  --output /artillery/results/report.json \
-  /artillery/scenarios/toy-fast.yml
+Total requests in the selected time range:
+
+```flux
+from(bucket: v.defaultBucket)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "artillery" and r["_field"] == "http_requests")
+  |> group()
+  |> sum()
 ```
 
-### Step 2: Create script to parse and send
+Requests per second, counted per window and divided by the window length (set the panel's **Min interval** to `10s`, as the lab's panels do, so a window is never shorter than Artillery's report period):
 
-Create `scripts/artillery-to-influx.js`:
-
-```javascript
-#!/usr/bin/env node
-
-const fs = require('fs');
-const { InfluxDB, Point } = require('@influxdata/influxdb-client');
-
-const reportPath = process.argv[2];
-const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-
-const influxUrl = process.env.INFLUXDB_URL || 'http://localhost:8086';
-const token = process.env.INFLUXDB_TOKEN;
-const org = process.env.INFLUXDB_ORG || 'myorg';
-const bucket = process.env.INFLUXDB_BUCKET || 'loadtests';
-
-const client = new InfluxDB({ url: influxUrl, token });
-const writeApi = client.getWriteApi(org, bucket);
-
-// Process aggregate data
-const summary = report.aggregate;
-const timestamp = Date.now();
-
-// Latencies
-const latPoint = new Point('http_req_duration')
-  .tag('tool', 'artillery')
-  .floatField('min', summary.latency.min)
-  .floatField('max', summary.latency.max)
-  .floatField('median', summary.latency.median)
-  .floatField('p95', summary.latency.p95)
-  .floatField('p99', summary.latency.p99)
-  .timestamp(timestamp);
-writeApi.writePoint(latPoint);
-
-// Request rate
-const reqPoint = new Point('http_requests')
-  .tag('tool', 'artillery')
-  .intField('count', summary.scenariosCompleted)
-  .intField('rate', summary.requestsCompleted / (summary.lastMetricAt - summary.firstMetricAt) * 1000)
-  .timestamp(timestamp);
-writeApi.writePoint(reqPoint);
-
-writeApi.close().then(() => {
-  console.log('✅ Metrics sent to InfluxDB');
-});
+```flux
+from(bucket: v.defaultBucket)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "artillery" and r["_field"] == "http_requests")
+  |> group()
+  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)
+  |> map(fn: (r) => ({ r with _value: float(v: r._value) / (float(v: int(v: v.windowPeriod)) / 1000000000.0) }))
 ```
 
-### Step 3: Execute
+p95 of each 10-second period, all requests (the overall series has no `class` tag):
 
-```bash
-# Run test
-docker-compose run --rm artillery run \
-  --output /artillery/results/report.json \
-  /artillery/scenarios/toy-fast.yml
-
-# Enviar a InfluxDB
-node scripts/artillery-to-influx.js artillery/results/report.json
+```flux
+from(bucket: v.defaultBucket)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "artillery_http_response_time" and r["_field"] == "p95" and not exists r.class)
+  |> group()
+  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)
 ```
+
+p95 of the 5xx responses only:
+
+```flux
+from(bucket: v.defaultBucket)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "artillery_http_response_time" and r["_field"] == "p95" and r["class"] == "5xx")
+  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)
+```
+
+Share of 2xx responses among all responses, as the "Success Rate" stats compute it:
+
+```flux
+from(bucket: v.defaultBucket)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "artillery_http_codes")
+  |> group()
+  |> reduce(identity: {ok: 0.0, all: 0.0}, fn: (r, accumulator) => ({ok: accumulator.ok + (if r._field =~ /^2/ then float(v: r._value) else 0.0), all: accumulator.all + float(v: r._value)}))
+  |> map(fn: (r) => ({_value: if r.all > 0.0 then r.ok / r.all * 100.0 else 0.0}))
+```
+
+### In the InfluxDB UI
+
+In the InfluxDB UI (http://localhost:8086, **Data Explorer** > **Script Editor**), write the bucket's name: `loadtests` unless you changed `INFLUXDB_BUCKET`.
+
+Responses per status code in the last 15 minutes:
+
+```flux
+from(bucket: "loadtests")
+  |> range(start: -15m)
+  |> filter(fn: (r) => r["_measurement"] == "artillery_http_codes")
+  |> group(columns: ["_field"])
+  |> sum()
+```
+
+Virtual users started per scenario in the last 15 minutes:
+
+```flux
+from(bucket: "loadtests")
+  |> range(start: -15m)
+  |> filter(fn: (r) => r["_measurement"] == "artillery_vusers_created_by_name")
+  |> group(columns: ["_field"])
+  |> sum()
+```
+
+Every measurement in the bucket:
+
+```flux
+import "influxdata/influxdb/schema"
+
+schema.measurements(bucket: "loadtests")
+```
+
+### Checking a run against Artillery's summary
+
+1. Run `ltlab artillery -s toy-fast.yml` and note `http.requests` in the summary it prints at the end
+2. Wait about 20 seconds for the last report to reach InfluxDB
+3. Sum `http_requests` over a range that covers the run (the "Total Requests" stat, or the first query above): the two numbers are the same
 
 ---
 
-## Solution Comparison
+## Your Own Artillery Scenarios
 
-| Solution              | Complexity | Real-time | Detailed Metrics | Recommended |
-|-----------------------|------------|-----------|------------------|-------------|
-| **Telegraf + StatsD** | Medium     | ✅ Yes     | ✅ Yes            | ⭐⭐⭐⭐⭐       |
-| **Custom Plugin**     | High       | ✅ Yes     | ✅ Yes            | ⭐⭐⭐⭐        |
-| **Post-Processing**   | Low        | ❌ No      | ⚠️ Partial       | ⭐⭐⭐         |
+For a scenario of your own (inside the lab or in your project, see [EXTERNAL_PROJECTS.md](EXTERNAL_PROJECTS.md)) to show up in the dashboards:
 
----
-
-## Final Recommendation
-
-**Use Solution 1 (Telegraf)** because:
-- ✅ Most robust and scalable
-- ✅ Doesn't modify Artillery (uses standard plugins)
-- ✅ Telegraf widely used in production
-- ✅ Real-time metrics
-- ✅ Easy to maintain and extend
-
----
-
-## Next Steps
-
-1. Implement chosen solution
-2. Create Grafana dashboards specific to Artillery
-3. Document in README.md
-4. Add usage examples
-
-**Related Resources:**
-- [Blog: Quickstart Guide](https://destbreso.com/blog/load-testing-lab-getting-started) - Extended setup with k6 and Artillery
-- [Blog: Common Scenarios](https://destbreso.com/blog/modeling-real-traffic-for-load-tests) - Practical Artillery examples
-- [USAGE.md](USAGE.md) - Complete usage guide with Artillery commands
+- Keep the `publish-metrics` block above in its `config`, with `prefix: "artillery."`
+- Give its scenarios names without spaces
+- To have `ensure` thresholds checked, list `ensure: {}` under `plugins`, as `toy-fast.yml` does; Artillery then prints the checks under `Checks:` and exits with code 1 when one is missed
+- To have `expect` blocks checked, list `expect` under `plugins`, as the chaos scenarios do; a failed expectation is printed and makes Artillery exit with code 21
 
 ---
 
 ## References
 
-- [Artillery StatsD Plugin](https://www.artillery.io/docs/guides/plugins/plugin-statsd-influxdb-graphite)
-- [Telegraf InfluxDB Output](https://docs.influxdata.com/telegraf/v1.28/plugins/outputs/influxdb_v2/)
-- [InfluxDB Client Libraries](https://docs.influxdata.com/influxdb/v2.0/api-guide/client-libraries/)
+**Related Resources:**
+- [Blog: Quickstart Guide](https://destbreso.com/blog/load-testing-lab-getting-started) - Extended setup with k6 and Artillery
+- [Blog: Common Scenarios](https://destbreso.com/blog/modeling-real-traffic-for-load-tests) - Practical Artillery examples
+- [USAGE.md](USAGE.md) - Complete usage guide with Artillery commands
+- [DASHBOARDS.md](DASHBOARDS.md) - The six dashboards and what each panel computes
+
+**External documentation:**
+- [Artillery publish-metrics plugin](https://www.artillery.io/docs/reference/extensions/publish-metrics)
+- [Telegraf StatsD input](https://github.com/influxdata/telegraf/tree/master/plugins/inputs/statsd)
+- [Telegraf InfluxDB v2 output](https://docs.influxdata.com/telegraf/v1.28/plugins/outputs/influxdb_v2/)

@@ -1,14 +1,13 @@
 # Chaos Engineering Scenarios
 
-Chaos scenarios are designed for **chaos engineering testing against the toy-api**. They're perfect for:
+Chaos scenarios exercise the **toy API's failure routes**: slow responses, random errors, CPU and I/O load. `ltlab chaos` always runs them against the toy API: it passes `TARGET_API_URL=http://toy-api:5000` to the run, whatever `.env` says. They are useful for:
 
-- 📚 **Teaching and tutorials** - Help beginners understand load testing metrics
-- 🎯 **Dashboard testing** - Verify your Grafana dashboards display correctly
-- 🎓 **Demos** - Show load testing concepts without external APIs
-- 🧪 **Learning chaos engineering** - Understand system behavior under failures
-- 👨‍🏫 **Training** - Explain testing concepts to non-technical people
+- 📚 **Teaching and tutorials** - Show what load testing metrics look like when things go wrong
+- 🎯 **Dashboard testing** - Check that your Grafana dashboards display errors and latency correctly
+- 🎓 **Demos** - Show load testing concepts without an external API
+- 🧪 **Learning chaos engineering** - Watch how a system behaves under failures
 
-Both **k6** and **Artillery** have chaos scenarios that test the same endpoints with different approaches.
+Both **k6** and **Artillery** have chaos scenarios that test the same endpoints with different approaches. The Artillery files are self-contained YAML, with no processor file.
 
 ---
 
@@ -24,29 +23,32 @@ Tests multiple chaotic endpoints with varied behaviors:
 - `/cpu` - CPU-intensive operations
 
 **k6 Implementation:**
-- Duration: 30s ramp-up → 1min sustained → 20s ramp-down
-- Target: 20 VUs with weighted endpoint selection
-- Custom metrics: error rate, timeout rate
-- Threshold: p95 < 3s, error rate < 50%
+- Stages: 30s ramp-up to 20 VUs → 1min at 20 VUs → 20s ramp-down
+- Each iteration picks one endpoint at random, weighted 3/2/2/1 (fast/slow/error/cpu)
+- Each request is tagged `endpoint` with the route's label (`Fast endpoint`, `Slow endpoint`, `Error prone`, `CPU intensive`), so k6's own `scenario` tag stays intact
+- Custom metrics: Rates `errors` (status other than 200, or 3s or more) and `timeouts`
+- Thresholds: p(95) < 3s, `errors` rate < 50%
 
 **Artillery Implementation:**
-- Phases: 30s ramp (10 RPS) → 60s sustained (20 RPS) → 20s cool down (5 RPS)
-- Scenario weighting for endpoint distribution
-- Think time between requests for realistic behavior
-- StatsD metrics to Telegraf
+- Phases: 30s at 10 new virtual users per second → 60s at 20/s → 20s at 5/s
+- Two weighted scenarios: `mixed-chaos-scenario` (weight 10: three rounds of `/fast`, `/slow`, `/error`, `/cpu` with think times) and `error-resilience` (weight 5: five calls to `/error`)
+- `expect` blocks check `/slow` and `/cpu`; the expect plugin is enabled and prints only failures
+- Metrics to Telegraf through publish-metrics
 
-**Perfect for:** Learning to interpret mixed failure patterns in dashboards.
+**Useful for:** Learning to interpret mixed failure patterns in dashboards.
 
 **Run with:**
 ```bash
 # k6
-ltlab chaos -e k6     # Interactive selector
+ltlab chaos -e k6     # then choose Basic
 ltlab k6 -s chaos-basic.js
 
 # Artillery
 ltlab chaos -e artillery
 ltlab artillery -s chaos-basic.yml
 ```
+
+`ltlab k6 -s` and `ltlab artillery -s` use `TARGET_API_URL` from `.env`; if it points at another API, add `-e TARGET_API_URL=http://toy-api:5000`.
 
 ---
 
@@ -62,18 +64,18 @@ Tests all problematic endpoints in sequence:
 - `/io` - I/O bottleneck
 
 **k6 Implementation:**
-- Duration: 20s normal → 30s spike → 40s sustained → 30s recovery → 20s cool down
-- VUs: 10 → 50 (sudden increase)
-- Custom metrics: error rate, timeout rate, recovery time
-- Threshold: p99 < 5s, error rate < 60%
+- Stages: 20s to 10 VUs → 30s to 50 VUs → 40s at 50 → 30s down to 10 → 20s down to 0
+- Each iteration calls `/slow`, `/error`, `/cpu` and `/io` in sequence, pausing 0.2s after each; requests are tagged `endpoint` and `chaos_type`
+- Custom metrics: Rates `errors` and `timeouts`, and the Trend `pass_duration`: the time for one pass through the four routes, pauses included
+- Think time: 2-5s after a pass with more than two errors, 0.5-2s otherwise
+- Thresholds: p(99) < 5s, `errors` rate < 60%, `timeouts` rate < 20%
 
 **Artillery Implementation:**
-- Phases: 20s normal (5 RPS) → 30s spike (30 RPS) → 40s sustained → 30s recovery
-- Two scenarios: "Everything Goes Wrong" + "Rapid Fire Chaos"
-- Rapid-fire requests with minimal think time
-- Threshold: p99 < 5s, error rate < 60%
+- Phases: 20s at 5 new virtual users per second → 30s at 30/s → 40s at 30/s → 30s at 5/s
+- Two scenarios: `everything-goes-wrong` (weight 10: `/slow`, `/error`, `/cpu`, `/io`, with `expect` checks) and `rapid-fire-chaos` (weight 5: ten requests to random paths, which the toy API answers with 404)
+- `ensure` checks: `maxErrorRate: 60`, `p99: 5000`
 
-**Perfect for:** Understanding system behavior under traffic spikes and simultaneous stress.
+**Useful for:** Understanding system behavior under traffic spikes and simultaneous stress.
 
 **Run with:**
 ```bash
@@ -94,22 +96,21 @@ ltlab artillery -s chaos-spike.yml
 Focuses on resilience patterns and error recovery mechanisms.
 
 **k6 Implementation:**
-- Hits `/error` endpoint with retry logic
-- Exponential backoff: 0.5s, 1s, 2s
-- Max 3 retry attempts
-- Duration: 1min ramp-up → 3min sustained → 30s ramp-down
-- Target: 30 VUs
-- Custom metrics: retry counter
-- Threshold: p90 < 4s, error rate < 40%, retries < 1000
+- Calls `/error` with up to 3 attempts, waiting 0.5s after the first failed attempt and 1s after the second (exponential backoff)
+- Requests are tagged `attempt` (1, 2 or 3)
+- In 30% of iterations, also calls one of `/fast`, `/slow` or `/cpu`
+- Stages: 1min ramp-up to 30 VUs → 3min at 30 → 30s ramp-down
+- Custom metrics: Rate `errors` (calls that still failed after their attempts), Trend `attempts` (attempts each call needed), Counter `retries` (recorded, without a threshold)
+- Thresholds: p(90) < 4s, `errors` rate < 40%, `attempts` avg < 1.5
+
+`/error` fails 30% of the time, so a call needs 1.39 attempts on average (1 + 0.3 + 0.09). The `attempts` threshold leaves room for normal variation and fails when `/error` fails clearly more often than that.
 
 **Artillery Implementation:**
-- Two scenarios: "Retry Logic Testing" + "Mixed Reliability"
-- Sequential calls with wait times between attempts
-- Tests both fast and slow endpoints
-- Phases: 60s gradual ramp (15 RPS) → 180s sustained (20 RPS) → 30s cool down
-- Threshold: p95 < 4s, error rate < 40%
+- Two scenarios: `retry-logic-testing` (weight 10: three calls to `/error` with waits in between; the third expects 200 or 500) and `mixed-reliability` (weight 5: two rounds of `/fast`, `/error`, `/slow`, then `/cpu` and `/io`)
+- Phases: 60s at 15 new virtual users per second → 180s at 20/s → 30s at 5/s
+- `ensure` checks: `maxErrorRate: 40`, `p95: 4000`
 
-**Perfect for:** Learning how to handle errors gracefully and measure recovery effectiveness.
+**Useful for:** Learning how to handle errors gracefully and measure recovery.
 
 **Run with:**
 ```bash
@@ -124,35 +125,51 @@ ltlab artillery -s chaos-resilience.yml
 
 ---
 
+## Pass, Fail and Exit Codes
+
+`ltlab chaos`, `ltlab k6` and `ltlab artillery` exit with the runner's exit code:
+
+- **k6** exits with 99 when a threshold fails
+- **Artillery** prints its `ensure` conditions under `Checks:`, each marked `ok` or `fail`, and exits with 1 when one fails. A failed `expect` check is printed during the run and makes Artillery exit with 21, unless an `ensure` check failed too
+
+Artillery's `maxErrorRate` is the share of virtual users that did not complete their scenario, not the share of 5xx responses. A failed expectation does not stop its virtual user, which goes on with its scenario. `chaos-basic.yml` has `expect` checks but no `ensure` checks.
+
+---
+
 ## What You'll Learn
 
-### Load Testing Fundamentals
-- **Request Distribution** - How different endpoints affect overall metrics
-- **Error Handling** - When and why errors occur
-- **Response Times** - How latency impacts user experience
-- **Resource Usage** - CPU and I/O bottleneck patterns
-- **Recovery Patterns** - How systems recover after stress
-- **Retry Mechanisms** - Exponential backoff and retry strategies
+By running these scenarios and watching the Grafana dashboards, you'll understand:
 
-### Chaos Engineering Principles
-- **Controlled Failures** - Introduce faults in safe environment
-- **Baseline vs Chaos** - Compare normal vs stressed behavior
-- **Observability** - Monitor what happens during chaos
-- **Resilience Testing** - Verify error handling works
-- **Gradual Stress** - Understand breaking points
+1. **Error Rate Patterns**
+   - How error spikes appear in graphs
+   - Difference between sustained and intermittent errors
+   - Impact of retry logic on error rates
 
-### Metrics Interpretation
-- **HTTP metrics** - Success rate, request rate, response times
-- **Percentiles** - p50, p90, p95, p99 meaning
-- **Error rates** - Acceptable vs critical thresholds
-- **Custom metrics** - Tracking specific behaviors (retries, timeouts)
-- **Trend analysis** - How metrics evolve over time
+2. **Response Time Metrics**
+   - What p50, p95, p99 mean in practice
+   - How latency affects different percentiles
+   - Response time distribution under chaos
+
+3. **Recovery Patterns**
+   - How long systems take to stabilize
+   - Visual indicators of recovery in metrics
+   - Difference between graceful and catastrophic degradation
+
+4. **Resource Impact**
+   - CPU-intensive operations and throughput
+   - I/O bottlenecks
+   - Correlation between load and response times
+
+5. **Chaos Engineering Principles**
+   - Controlled failures in a safe environment
+   - Baseline versus chaos: compare normal and stressed behavior
+   - Retry strategies such as exponential backoff, and their cost
 
 ---
 
 ## Using with Grafana
 
-All chaos scenarios produce rich metrics visible in Grafana dashboards:
+All chaos scenarios produce metrics visible in the Grafana dashboards (http://localhost:3000).
 
 ### k6 Metrics Flow
 ```
@@ -160,33 +177,55 @@ k6 → InfluxDB v2 → Grafana
 ```
 
 **Available Dashboards:**
-- **k6 Load Testing Results** - HTTP metrics, VUs, data transfer
-- **k6 Performance Testing** - Percentiles, checks, trends
-- **k6 Prometheus** - Resource usage and custom metrics
+- **k6 Load Testing - War Room** (`k6-dashboard`) - Request duration, VUs, slowest endpoints, percentiles
+- **K6 Load Testing - Pro Dashboard** (`k6-pro`) - Requests per second, error rate, request phases
+- **K6 Elite Performance War Room** (`k6-elite`) - Heatmap, success rate, VU utilization
+
+The scenarios' custom metrics (`errors`, `timeouts`, `pass_duration`, `attempts`, `retries`) are stored as measurements with their samples in the field `value`, and the tags `endpoint`, `chaos_type` and `attempt` travel with each request. The built-in dashboards do not chart them; query them in Explore or in a panel of your own. For example, the average number of attempts per call in `chaos-resilience.js`:
+
+```flux
+from(bucket: v.defaultBucket)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "attempts" and r["_field"] == "value")
+  |> group()
+  |> mean()
+```
+
+And the p95 of each endpoint in `chaos-basic.js`:
+
+```flux
+from(bucket: v.defaultBucket)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "http_req_duration" and r["_field"] == "value")
+  |> group(columns: ["endpoint"])
+  |> quantile(q: 0.95, method: "exact_mean")
+```
 
 ### Artillery Metrics Flow
 ```
-Artillery → StatsD → Telegraf → InfluxDB v2 → Grafana
+Artillery → publish-metrics (StatsD) → Telegraf → InfluxDB v2 → Grafana
 ```
 
 **Available Dashboards:**
-- **Artillery Performance** - HTTP metrics, response times, error rates
-- **Artillery Scenarios** - Scenario-specific metrics
-- **StatsD Telegraf** - Custom metrics and request distribution
+- **Artillery + Telegraf - War Room** (`artillery-telegraf`) - Requests per second, latency, totals
+- **Artillery Load Testing - Pro Dashboard** (`artillery-pro`) - Status codes, scenarios completed, virtual users per scenario name
+- **Artillery Elite Load & Stress War Room** (`artillery-elite`) - Success rates, status code distribution, scenario counts
+
+Scenario names reach InfluxDB as fields of `artillery_vusers_created_by_name`; StatsD cuts a name at its first space, which is why the lab's scenario names are in kebab-case. Artillery panels trail a run by up to about 20 seconds.
 
 ### Recommended Viewing
-1. Start chaos scenario
-2. Open relevant Grafana dashboard (auto-opens with `ltlab`)
-3. Watch metrics in real-time
+1. Open the dashboard for your engine in Grafana
+2. Start the chaos scenario (`ltlab chaos` prints the Grafana URL when it finishes)
+3. Watch metrics change as the run progresses (dashboards refresh every 5 seconds)
 4. Identify patterns during ramp-up, sustained load, and recovery
 5. Compare behavior across different chaos types
 
 ### Key Panels to Watch
-- **Request Rate** - See traffic patterns (spikes, sustained load)
-- **Response Time Distribution** - p95/p99 during chaos
-- **Error Rate** - Track failures during stress
-- **Active VUs/RPS** - Correlate load with response times
-- **Custom Metrics** - Retries, timeouts, specific endpoint behavior
+- **Requests Per Second** - Traffic patterns (spikes, sustained load)
+- **Response Time Percentiles** - p95/p99 during chaos
+- **Error Rate (%)** (k6) and **HTTP Response Codes** (Artillery) - Failures during stress
+- **Virtual Users** (k6) and **Scenario Counts** (Artillery) - Load against response times
+- **Success Rate** and **Scenario Success Rate** - How much of the run succeeded
 
 ---
 
@@ -197,10 +236,9 @@ Both engines can run chaos scenarios, but they have different strengths:
 ### k6 Strengths
 - **JavaScript-based** - Familiar syntax for developers
 - **Rich scripting** - Complex logic, conditionals, custom functions
-- **Custom metrics** - Define your own counters and trends
+- **Custom metrics** - Define your own counters, rates and trends
 - **Thresholds** - Built-in pass/fail criteria
 - **Checks** - In-script assertions
-- **Cloud integration** - Grafana k6 Cloud support
 - **HTTP/2, WebSocket, gRPC** - Protocol support
 
 **Best for:**
@@ -216,7 +254,7 @@ Both engines can run chaos scenarios, but they have different strengths:
 - **Phases** - Define traffic patterns easily
 - **Think time** - Simulate realistic user behavior
 - **Loop constructs** - Repeat actions without code
-- **Plugins** - Extensive ecosystem (AWS, Slack, etc.)
+- **Plugins** - publish-metrics, expect, ensure and more
 - **Expectations** - Simple pass/fail conditions
 
 **Best for:**
@@ -228,16 +266,16 @@ Both engines can run chaos scenarios, but they have different strengths:
 
 ### Chaos Scenarios Comparison
 
-| Feature                | k6                         | Artillery                 |
-|------------------------|----------------------------|---------------------------|
-| **Syntax**             | JavaScript                 | YAML                      |
-| **VU/RPS control**     | VUs (virtual users)        | RPS (requests per second) |
-| **Retry logic**        | Custom code                | Sequential calls + waits  |
-| **Endpoint selection** | Weighted random            | Scenario weights          |
-| **Custom metrics**     | `Trend`, `Counter`, `Rate` | StatsD tags               |
-| **Thresholds**         | Built-in                   | Plugin-based              |
-| **Think time**         | `sleep()` function         | `think: X` property       |
-| **Complexity**         | More flexible              | More structured           |
+| Feature                | k6                         | Artillery                                   |
+|------------------------|----------------------------|---------------------------------------------|
+| **Syntax**             | JavaScript                 | YAML                                        |
+| **Load control**       | VUs (virtual users)        | Arrival rate (new virtual users per second) |
+| **Retry logic**        | Custom code                | Sequential calls + waits                    |
+| **Endpoint selection** | Weighted random            | Scenario weights                            |
+| **Custom metrics**     | `Trend`, `Counter`, `Rate` | From JavaScript processor functions         |
+| **Thresholds**         | Built-in                   | `ensure` plugin                             |
+| **Think time**         | `sleep()` function         | `think: X` property                         |
+| **Complexity**         | More flexible              | More structured                             |
 
 ### When to Use Each
 
@@ -259,60 +297,62 @@ Both engines can run chaos scenarios, but they have different strengths:
 
 ## Target API Endpoints (toy-api)
 
-All chaos scenarios target these local endpoints:
+All chaos scenarios target these toy API endpoints:
 
-| Endpoint | Behavior            | Use Case            |
-|----------|---------------------|---------------------|
-| `/fast`  | Instant response    | Baseline (no chaos) |
-| `/slow`  | 500-2500ms latency  | Latency testing     |
-| `/error` | 30% random failures | Error handling      |
-| `/cpu`   | CPU-intensive ops   | Resource stress     |
-| `/io`    | I/O operations      | I/O bottleneck      |
+| Endpoint | Behavior                                                    | Use Case            |
+|----------|-------------------------------------------------------------|---------------------|
+| `/fast`  | Responds immediately with JSON                              | Baseline (no chaos) |
+| `/slow`  | Waits 500-2500ms before responding                          | Latency testing     |
+| `/error` | Answers 500 in 30% of requests                              | Error handling      |
+| `/cpu`   | Runs a synchronous loop of 10 million square roots          | Resource stress     |
+| `/io`    | Waits 300-1500ms (simulated I/O)                            | I/O bottleneck      |
+
+`/cpu` blocks the toy API's event loop while it runs, so under load it also slows down every other route.
 
 **Why toy-api?**
 - 🔒 **Safe** - No external dependencies
 - 🎯 **Predictable** - Known failure rates
 - 📚 **Educational** - Clear cause-effect relationships
-- 🚀 **Fast** - Instant setup, no configuration
-- 🎓 **Teaching-friendly** - Explain concepts without complexity
+- 🚀 **Fast** - Starts with the lab, no configuration
 
 ---
 
 ## Tips for Teaching & Demos
 
 ### Before Running Scenarios
-1. Start toy-api: `ltlab toy start`
-2. Open Grafana: `http://localhost:3003`
+1. Start the lab (the toy API included): `ltlab start`
+2. Open Grafana: `http://localhost:3000`
 3. Explain chaos engineering concepts
-4. Show endpoint behaviors (optional: `curl http://localhost:8080/fast`)
+4. Show endpoint behaviors (optional: `curl http://localhost:5000/fast`, with the port from `TOY_API_PORT`)
+5. Start with chaos-basic, the easiest to follow; show a normal run (`toy-fast`) first if you want a baseline
 
 ### During Scenarios
-1. Run chaos scenario: `ltlab chaos`
-2. Watch Grafana dashboards in real-time
-3. Point out key metrics as they change
+1. Run the chaos scenario: `ltlab chaos`
+2. Watch the Grafana dashboards
+3. Point out key metrics as they change, one metric at a time
 4. Explain why certain patterns appear
 5. Show correlation between load and response times
 
 ### After Scenarios
-1. Review final dashboard state
-2. Compare normal vs chaos behavior
-3. Discuss what worked/failed
+1. Review the final dashboard state
+2. Compare normal and chaos behavior
+3. Discuss what worked and what failed
 4. Explain recovery patterns
-5. Show how to interpret percentiles
+5. Show how to interpret percentiles; use chaos-resilience to discuss error handling
 
 ### Common Teaching Points
-- **Why p95/p99 matter** - Most users won't experience p50
-- **Error budgets** - 1% error rate = 7+ hours downtime/month
+- **Why p95/p99 matter** - The median hides the slow requests that a share of users still get
+- **Error budgets** - A 1% error rate is the equivalent of about 7 hours of downtime in a 30-day month
 - **Retry storms** - Aggressive retries can worsen failures
 - **Graceful degradation** - Systems should handle load gracefully
 - **Observability** - Can't fix what you can't measure
 
 ### Demo Gotchas
-- ⚠️ **InfluxDB retention** - Data kept for 30 days by default
-- ⚠️ **Dashboard refresh** - Set to 5s for live updates
+- ⚠️ **InfluxDB retention** - The bucket keeps everything unless you set a retention in the InfluxDB UI (`ltlab metrics` shows it); `ltlab reset` deletes stored metrics between demos
+- ⚠️ **Dashboard refresh** - Dashboards refresh every 5 seconds; Artillery panels trail the run by up to about 20 seconds
 - ⚠️ **Browser tabs** - Close unused tabs to avoid memory issues
 - ⚠️ **Container resources** - Ensure Docker has enough CPU/RAM
-- ⚠️ **Concurrent tests** - Don't run k6 + Artillery simultaneously (metrics collision)
+- ⚠️ **Concurrent tests** - k6 and Artillery write different measurements, but running both at once sends their load to the same toy API, which makes each result harder to read
 
 ---
 
@@ -322,8 +362,10 @@ All chaos scenarios target these local endpoints:
 - 🎯 [Dashboards](./DASHBOARDS.md) - Grafana dashboard details
 - 🔧 [Troubleshooting](./TROUBLESHOOTING.md) - Common issues
 - 🏗️ [Setup](./SETUP.md) - Installation and configuration
-- 🚀 [Testing Guide](./TESTING_GUIDE.md) - Complete testing workflows
-- 🎓 [Chaos Testing Guide](./CHAOS_TESTING_GUIDE.md) - In-depth chaos engineering
+- 📈 [Artillery and InfluxDB](./ARTILLERY_INFLUXDB_GUIDE.md) - How Artillery's metrics reach the dashboards
+- 🏠 [Main README](../README.md) and [CLI Documentation](../cli/README.md)
+- 🧸 [Toy API endpoints](../toy-api/src/README.md)
+- 💬 Chaos command help: `ltlab chaos --help`
 - 📝 [Blog: Advanced Traffic Patterns and Chaos Testing](https://destbreso.com/blog/chaos-testing-under-load) - Article with practical examples and best practices
 
 ---
@@ -331,83 +373,3 @@ All chaos scenarios target these local endpoints:
 ## License
 
 MIT - See [LICENSE](../LICENSE) for details.
-
----
-
-## What You'll Learn
-
-By running these scenarios and observing the Grafana dashboards, you'll understand:
-
-1. **Error Rate Patterns**
-   - How error spikes appear in graphs
-   - Difference between sustained vs intermittent errors
-   - Impact of retry logic on error rates
-
-2. **Response Time Metrics**
-   - What p50, p95, p99 mean in practice
-   - How latency affects different percentiles
-   - Response time distribution under chaos
-
-3. **Recovery Patterns**
-   - How long systems take to stabilize
-   - Visual indicators of recovery in metrics
-   - Difference between graceful vs catastrophic degradation
-
-4. **Resource Impact**
-   - CPU-intensive operations on throughput
-   - I/O bottlenecks visualization
-   - Correlation between load and resource usage
-
-5. **Dashboard Interpretation**
-   - Which panels show which problems
-   - How to spot issues quickly
-   - Reading graphs under abnormal conditions
-
----
-
-## Using with Grafana
-
-After running chaos scenarios:
-
-1. Open Grafana: http://localhost:3000
-2. Go to k6 dashboards (k6-dashboard, k6-elite, or k6-pro)
-3. Observe these panels:
-   - **Request Rate** - Shows traffic patterns
-   - **Error Rate** - Spikes during chaos
-   - **Response Time** - p50/p95/p99 changes
-   - **Success vs Failures** - Visual separation
-   - **Request Duration Distribution** - Shape changes under chaos
-
----
-
-## Target API Endpoints
-
-These scenarios use the **toy-api** endpoints:
-
-- `GET /fast` - Fast response (~10ms)
-- `GET /slow` - Variable latency (500-2500ms)
-- `GET /error` - 30% random failure rate
-- `GET /cpu` - CPU-intensive operation
-- `GET /io` - I/O operation with delays
-
-**No external APIs needed!** Everything runs locally and safely.
-
----
-
-## Tips for Teaching/Demos
-
-1. **Start with chaos-basic** - Easiest to understand
-2. **Run scenario while showing Grafana** - Real-time visualization
-3. **Explain what's happening** - Point out patterns as they appear
-4. **Compare before/after** - Show normal load first, then chaos
-5. **Focus on one metric at a time** - Don't overwhelm beginners
-6. **Use chaos-resilience** - To teach error handling best practices
-
----
-
-## For More Information
-
-- Main README: [../../README.md](../../README.md)
-- CLI Documentation: [../../cli/README.md](../../cli/README.md)
-- Toy API endpoints: [../../toy-api/src/README.md](../../toy-api/src/README.md)
-- Chaos command help: `ltlab chaos --help`

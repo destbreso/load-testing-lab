@@ -1,6 +1,6 @@
 {
   "name": "load-testing-lab",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Reusable, containerized load testing lab for APIs using k6 and Artillery",
   "type": "module",
   "bin": {
