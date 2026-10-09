@@ -89,7 +89,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_reqs\")\n  |> count()",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: -5m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_reqs\")\n  |> group()\n  |> count()",
           "refId": "A"
         }
       ],
@@ -187,7 +187,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
           "refId": "A"
         }
       ],
@@ -277,7 +277,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"vus\" or r[\"_measurement\"] == \"vus_max\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\" or r[\"_field\"] == \"gauge\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"vus\" or r[\"_measurement\"] == \"vus_max\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\" or r[\"_field\"] == \"gauge\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
           "refId": "A"
         }
       ],
@@ -336,7 +336,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_reqs\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> count()",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_reqs\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group()\n  |> count()",
           "refId": "A"
         }
       ],
@@ -395,7 +395,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"iterations\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> count()",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"iterations\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group()\n  |> count()",
           "refId": "A"
         }
       ],
@@ -464,7 +464,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group(columns: [\"name\", \"status\", \"method\"])\n  |> mean()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 10)",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group(columns: [\"name\", \"status\", \"method\"])\n  |> mean()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 10)",
           "refId": "A"
         }
       ],
@@ -658,7 +658,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.50, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p50\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.50, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p50\")",
           "refId": "A"
         },
         {
@@ -666,7 +666,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.75, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p75\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.75, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p75\")",
           "refId": "B"
         },
         {
@@ -674,7 +674,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.90, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p90\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.90, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p90\")",
           "refId": "C"
         },
         {
@@ -682,7 +682,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.95, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p95\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.95, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p95\")",
           "refId": "D"
         },
         {
@@ -690,7 +690,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.99, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p99\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.99, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p99\")",
           "refId": "E"
         }
       ],
@@ -758,7 +758,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> quantile(q: 0.5, method: \"exact_mean\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group()\n  |> quantile(q: 0.5, method: \"exact_mean\")",
           "refId": "A"
         }
       ],
@@ -826,7 +826,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> quantile(q: 0.75, method: \"exact_mean\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group()\n  |> quantile(q: 0.75, method: \"exact_mean\")",
           "refId": "A"
         }
       ],
@@ -894,7 +894,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> quantile(q: 0.9, method: \"exact_mean\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group()\n  |> quantile(q: 0.9, method: \"exact_mean\")",
           "refId": "A"
         }
       ],
@@ -962,7 +962,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> quantile(q: 0.95, method: \"exact_mean\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group()\n  |> quantile(q: 0.95, method: \"exact_mean\")",
           "refId": "A"
         }
       ],
@@ -1030,7 +1030,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> quantile(q: 0.99, method: \"exact_mean\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"http_req_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> group()\n  |> quantile(q: 0.99, method: \"exact_mean\")",
           "refId": "A"
         }
       ],

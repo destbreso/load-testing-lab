@@ -3,7 +3,7 @@
   "uid": "artillery-elite",
   "schemaVersion": 38,
   "version": 1,
-  "refresh": "3s",
+  "refresh": "5s",
   "time": {
     "from": "now-30m",
     "to": "now"
@@ -27,7 +27,7 @@
       },
       "targets": [
         {
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"latency\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_response_time\" and (r[\"_field\"] == \"p99\") and not exists r.class)\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
           "refId": "A"
         }
       ],
@@ -40,7 +40,8 @@
             "fillOpacity": 20
           }
         }
-      }
+      },
+      "interval": "10s"
     },
     {
       "type": "heatmap",
@@ -57,8 +58,8 @@
       },
       "targets": [
         {
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"latency\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
-          "refId": "B"
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_response_time\" and (r[\"_field\"] == \"p50\" or r[\"_field\"] == \"p75\" or r[\"_field\"] == \"p90\" or r[\"_field\"] == \"p95\" or r[\"_field\"] == \"p99\") and not exists r.class)\n  |> group()",
+          "refId": "A"
         }
       ],
       "options": {
@@ -112,7 +113,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "interval": "10s"
     },
     {
       "type": "timeseries",
@@ -129,15 +131,16 @@
       },
       "targets": [
         {
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"rps\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
-          "refId": "C"
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\" and (r[\"_field\"] == \"http_requests\"))\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)\n  |> map(fn: (r) => ({ r with _value: float(v: r._value) / (float(v: int(v: v.windowPeriod)) / 1000000000.0) }))",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "reqps"
         }
-      }
+      },
+      "interval": "10s"
     },
     {
       "type": "timeseries",
@@ -154,10 +157,11 @@
       },
       "targets": [
         {
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"codes\")\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)",
-          "refId": "D"
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_codes\")\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)",
+          "refId": "A"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "type": "timeseries",
@@ -174,15 +178,16 @@
       },
       "targets": [
         {
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"scenarioDuration\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
-          "refId": "E"
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_vusers_session_length\" and (r[\"_field\"] == \"median\" or r[\"_field\"] == \"p95\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "ms"
         }
-      }
+      },
+      "interval": "10s"
     },
     {
       "type": "timeseries",
@@ -199,10 +204,11 @@
       },
       "targets": [
         {
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"scenarioCounts\")\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)",
-          "refId": "F"
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\" and (r[\"_field\"] == \"vusers_created\" or r[\"_field\"] == \"vusers_completed\" or r[\"_field\"] == \"vusers_failed\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)",
+          "refId": "A"
         }
-      ]
+      ],
+      "interval": "10s"
     },
     {
       "type": "stat",
@@ -219,8 +225,8 @@
       },
       "targets": [
         {
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"codes\")\n  |> sum()",
-          "refId": "G"
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\" and (r[\"_field\"] == \"http_requests\"))\n  |> group()\n  |> sum()",
+          "refId": "A"
         }
       ]
     },
@@ -239,8 +245,8 @@
       },
       "targets": [
         {
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"latency\")\n  |> mean()",
-          "refId": "H"
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_response_time\" and (r[\"_field\"] == \"mean\" or r[\"_field\"] == \"count\") and not exists r.class)\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> filter(fn: (r) => exists r.mean and exists r.count)\n  |> group()\n  |> reduce(identity: {total: 0.0, n: 0.0}, fn: (r, accumulator) => ({total: accumulator.total + r.mean * r.count, n: accumulator.n + r.count}))\n  |> map(fn: (r) => ({_value: if r.n > 0.0 then r.total / r.n else 0.0}))",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -264,8 +270,8 @@
       },
       "targets": [
         {
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"rps\")\n  |> mean()",
-          "refId": "I"
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\" and (r[\"_field\"] == \"http_request_rate\"))\n  |> group()\n  |> mean()",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -289,8 +295,8 @@
       },
       "targets": [
         {
-          "query": "codes_2xx = from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"codes\" and r[\"status\"] =~ /^2/)\n  |> sum()\n  |> findColumn(fn: (key) => true, column: \"_value\")\n  |> reduce(fn: (r, accumulator) => ({ sum: r + accumulator.sum }), identity: {sum: 0.0})\n\ntotal = from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"codes\")\n  |> sum()\n  |> findColumn(fn: (key) => true, column: \"_value\")\n  |> reduce(fn: (r, accumulator) => ({ sum: r + accumulator.sum }), identity: {sum: 0.0})\n\nfrom(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"codes\")\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)\n  |> group()\n  |> sum()\n  |> limit(n: 1)\n  |> map(fn: (r) => ({ r with _value: 99.5 }))",
-          "refId": "J"
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_codes\")\n  |> group()\n  |> reduce(identity: {ok: 0.0, all: 0.0}, fn: (r, accumulator) => ({ok: accumulator.ok + (if r._field =~ /^2/ then float(v: r._value) else 0.0), all: accumulator.all + float(v: r._value)}))\n  |> map(fn: (r) => ({_value: if r.all > 0.0 then r.ok / r.all * 100.0 else 0.0}))",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -341,8 +347,8 @@
       },
       "targets": [
         {
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"scenarioCounts\")\n  |> mean()\n  |> map(fn: (r) => ({ r with _value: 98.0 }))",
-          "refId": "K"
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\" and (r[\"_field\"] == \"vusers_completed\" or r[\"_field\"] == \"vusers_failed\"))\n  |> group()\n  |> reduce(identity: {done: 0.0, failed: 0.0}, fn: (r, accumulator) => ({done: accumulator.done + (if r._field == \"vusers_completed\" then float(v: r._value) else 0.0), failed: accumulator.failed + (if r._field == \"vusers_failed\" then float(v: r._value) else 0.0)}))\n  |> map(fn: (r) => ({_value: if r.done + r.failed > 0.0 then r.done / (r.done + r.failed) * 100.0 else 0.0}))",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -376,7 +382,8 @@
         "colorMode": "background",
         "graphMode": "area",
         "textMode": "value_and_name"
-      }
+      },
+      "description": "Virtual users that completed their scenario, as a share of those that finished (completed or failed)."
     },
     {
       "type": "stat",
@@ -393,8 +400,8 @@
       },
       "targets": [
         {
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"scenarioDuration\")\n  |> mean()",
-          "refId": "L"
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_vusers_session_length\" and (r[\"_field\"] == \"mean\" or r[\"_field\"] == \"count\"))\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> filter(fn: (r) => exists r.mean and exists r.count)\n  |> group()\n  |> reduce(identity: {total: 0.0, n: 0.0}, fn: (r, accumulator) => ({total: accumulator.total + r.mean * r.count, n: accumulator.n + r.count}))\n  |> map(fn: (r) => ({_value: if r.n > 0.0 then r.total / r.n else 0.0}))",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -424,8 +431,8 @@
       },
       "targets": [
         {
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"codes\")\n  |> group(columns: [\"status\"])\n  |> sum()",
-          "refId": "M"
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_codes\")\n  |> group(columns: [\"_field\"])\n  |> sum()",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -501,8 +508,8 @@
       },
       "targets": [
         {
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"rps\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> movingAverage(n: 5)",
-          "refId": "N"
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery\" and (r[\"_field\"] == \"http_requests\"))\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)\n  |> map(fn: (r) => ({ r with _value: float(v: r._value) / (float(v: int(v: v.windowPeriod)) / 1000000000.0) }))\n  |> movingAverage(n: 5)",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -515,7 +522,8 @@
             "gradientMode": "scheme"
           }
         }
-      }
+      },
+      "interval": "10s"
     },
     {
       "datasource": {
@@ -704,7 +712,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_response_time\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.50, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p50\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_response_time\" and (r[\"_field\"] == \"p50\") and not exists r.class)\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> set(key: \"_field\", value: \"p50\")",
           "refId": "A"
         },
         {
@@ -712,7 +720,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_response_time\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.75, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p75\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_response_time\" and (r[\"_field\"] == \"p75\") and not exists r.class)\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> set(key: \"_field\", value: \"p75\")",
           "refId": "B"
         },
         {
@@ -720,7 +728,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_response_time\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.90, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p90\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_response_time\" and (r[\"_field\"] == \"p90\") and not exists r.class)\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> set(key: \"_field\", value: \"p90\")",
           "refId": "C"
         },
         {
@@ -728,7 +736,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_response_time\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.95, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p95\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_response_time\" and (r[\"_field\"] == \"p95\") and not exists r.class)\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> set(key: \"_field\", value: \"p95\")",
           "refId": "D"
         },
         {
@@ -736,12 +744,14 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_response_time\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: (tables=<-, column) => \n      tables \n        |> quantile(q: 0.99, column: column, method: \"exact_mean\"), \n      createEmpty: false)\n  |> set(key: \"_field\", value: \"p99\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_response_time\" and (r[\"_field\"] == \"p99\") and not exists r.class)\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> set(key: \"_field\", value: \"p99\")",
           "refId": "E"
         }
       ],
       "title": "\ud83d\udcca Response Time Percentiles (p50, p75, p90, p95, p99)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Each line is the percentile Artillery computed for each 10-second period.",
+      "interval": "10s"
     },
     {
       "datasource": {
@@ -804,12 +814,13 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_response_time\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> quantile(q: 0.5, method: \"exact_mean\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_response_time\" and (r[\"_field\"] == \"p50\") and not exists r.class)\n  |> group()\n  |> max()",
           "refId": "A"
         }
       ],
-      "title": "Median Percentile (p50)",
-      "type": "stat"
+      "title": "p50, worst report",
+      "type": "stat",
+      "description": "The highest p50 among Artillery's 10-second periods in the selected range. Artillery sends percentiles already computed per period, so this is an upper bound on the run's p50."
     },
     {
       "datasource": {
@@ -872,12 +883,13 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_response_time\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> quantile(q: 0.75, method: \"exact_mean\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_response_time\" and (r[\"_field\"] == \"p75\") and not exists r.class)\n  |> group()\n  |> max()",
           "refId": "A"
         }
       ],
-      "title": "75th Percentile (p75)",
-      "type": "stat"
+      "title": "p75, worst report",
+      "type": "stat",
+      "description": "The highest p75 among Artillery's 10-second periods in the selected range. Artillery sends percentiles already computed per period, so this is an upper bound on the run's p75."
     },
     {
       "datasource": {
@@ -940,12 +952,13 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_response_time\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> quantile(q: 0.9, method: \"exact_mean\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_response_time\" and (r[\"_field\"] == \"p90\") and not exists r.class)\n  |> group()\n  |> max()",
           "refId": "A"
         }
       ],
-      "title": "90th Percentile (p90)",
-      "type": "stat"
+      "title": "p90, worst report",
+      "type": "stat",
+      "description": "The highest p90 among Artillery's 10-second periods in the selected range. Artillery sends percentiles already computed per period, so this is an upper bound on the run's p90."
     },
     {
       "datasource": {
@@ -1008,12 +1021,13 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_response_time\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> quantile(q: 0.95, method: \"exact_mean\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_response_time\" and (r[\"_field\"] == \"p95\") and not exists r.class)\n  |> group()\n  |> max()",
           "refId": "A"
         }
       ],
-      "title": "95th Percentile (p95)",
-      "type": "stat"
+      "title": "p95, worst report",
+      "type": "stat",
+      "description": "The highest p95 among Artillery's 10-second periods in the selected range. Artillery sends percentiles already computed per period, so this is an upper bound on the run's p95."
     },
     {
       "datasource": {
@@ -1076,12 +1090,13 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"loadtests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_response_time\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> quantile(q: 0.99, method: \"exact_mean\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"artillery_http_response_time\" and (r[\"_field\"] == \"p99\") and not exists r.class)\n  |> group()\n  |> max()",
           "refId": "A"
         }
       ],
-      "title": "99th Percentile (p99)",
-      "type": "stat"
+      "title": "p99, worst report",
+      "type": "stat",
+      "description": "The highest p99 among Artillery's 10-second periods in the selected range. Artillery sends percentiles already computed per period, so this is an upper bound on the run's p99."
     }
   ],
   "tags": [
