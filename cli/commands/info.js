@@ -19,9 +19,9 @@ export default async function showInfo() {
       envConfig.INFLUXDB_ORG
     ) {
       console.log(chalk.cyan("  📦 InfluxDB:"));
-      if (envConfig.INFLUXDB_URL) {
-        console.log(chalk.dim(`     URL:    ${envConfig.INFLUXDB_URL}`));
-      }
+      const influxUrl =
+        envConfig.INFLUXDB_URL || `http://localhost:${envConfig.INFLUXDB_PORT_EXPORT || 8086}`;
+      console.log(chalk.dim(`     URL:    ${influxUrl}`));
       if (envConfig.INFLUXDB_ORG) {
         console.log(chalk.dim(`     Org:    ${envConfig.INFLUXDB_ORG}`));
       }

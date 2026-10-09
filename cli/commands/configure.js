@@ -8,7 +8,6 @@ import { ENV_PATH, readLabEnv } from "../lib/lab.js";
 // (ports, project-specific variables) is kept below them.
 const KEYS = [
   "TARGET_API_URL",
-  "INFLUXDB_URL",
   "INFLUXDB_TOKEN",
   "INFLUXDB_ORG",
   "INFLUXDB_BUCKET",
@@ -28,20 +27,24 @@ export function renderEnv(values, current = {}) {
   return lines.join("\n") + "\n";
 }
 
-// INFLUXDB_URL is for the scripts that run on your machine (reset, metrics),
-// so it points at the port InfluxDB publishes. Older versions of this command
-// suggested the container-only address http://influxdb:8086, which does not
-// resolve outside Docker; that value is replaced.
-function hostInfluxUrl(current) {
+// The scripts that run on your machine (reset, metrics, check-influx) reach
+// InfluxDB at http://localhost:<INFLUXDB_PORT_EXPORT>, so INFLUXDB_URL is only
+// needed for an InfluxDB somewhere else. A value that just repeats that
+// address, or the container-only http://influxdb:8086, is dropped, so moving
+// the port never leaves a stale URL behind.
+function withoutAutomaticInfluxUrl(current) {
   const url = current.INFLUXDB_URL;
-  if (url && !/\/\/influxdb[:/]/.test(url)) return url;
-  return `http://localhost:${current.INFLUXDB_PORT_EXPORT || 8086}`;
+  if (!url) return current;
+  const automatic = /\/\/influxdb[:/]/.test(url) || /^http:\/\/(localhost|127\.0\.0\.1):\d+\/?$/.test(url);
+  if (!automatic) return current;
+  const { INFLUXDB_URL, ...rest } = current;
+  return rest;
 }
 
 export default async function configureEnv() {
   try {
     console.log(chalk.blue(`Configure your Load Testing Lab environment (${ENV_PATH})`));
-    const current = readLabEnv() || {};
+    const current = withoutAutomaticInfluxUrl(readLabEnv() || {});
 
     const answers = await inquirer.prompt([
       {
@@ -67,7 +70,6 @@ export default async function configureEnv() {
     const keptToken = Boolean(current.INFLUXDB_TOKEN);
     const values = {
       ...answers,
-      INFLUXDB_URL: hostInfluxUrl(current),
       // InfluxDB adopts this token as its admin token on its first start, and
       // k6, Telegraf and Grafana read the same value from here
       INFLUXDB_TOKEN: current.INFLUXDB_TOKEN || crypto.randomBytes(32).toString("hex"),
