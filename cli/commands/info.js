@@ -32,6 +32,12 @@ export default async function showInfo() {
       if (envConfig.INFLUXDB_BUCKET) {
         console.log(chalk.dim(`     Bucket: ${envConfig.INFLUXDB_BUCKET}`));
       }
+      if (envConfig.INFLUXDB_USER) {
+        console.log(chalk.dim(`     User:   ${envConfig.INFLUXDB_USER}`));
+      }
+      if (envConfig.INFLUXDB_PASSWORD) {
+        console.log(chalk.dim(`     Password: ***${envConfig.INFLUXDB_PASSWORD.slice(-3)}`));
+      }
       console.log();
     }
 
@@ -91,6 +97,8 @@ export default async function showInfo() {
       "INFLUXDB_TOKEN",
       "INFLUXDB_ORG",
       "INFLUXDB_BUCKET",
+      "INFLUXDB_USER",
+      "INFLUXDB_PASSWORD",
       "GRAFANA_PORT",
       "GRAFANA_USER",
       "GRAFANA_PASSWORD",

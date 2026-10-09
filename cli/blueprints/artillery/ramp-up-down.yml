@@ -56,6 +56,11 @@ config:
         host: "{{ $processEnvironment.STATSD_HOST }}"
         port: "{{ $processEnvironment.STATSD_PORT }}"
         prefix: "artillery."
+    # Applies the ensure checks below; the run fails (exit code 1) when one is missed
+    ensure: {}
+    # Turns the expect blocks below into checks; only failures are printed
+    expect:
+      outputFormat: prettyError
   
   ensure:
     maxErrorRate: 5           # Allow 5% errors under high load

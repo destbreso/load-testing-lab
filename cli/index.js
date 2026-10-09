@@ -55,8 +55,8 @@ ${chalk.bold("Quick Start:")}
   ${chalk.yellow("0.")} Create symlink:         ${chalk.green("npm link")}
   ${chalk.yellow("1.")} Configure environment:  ${chalk.green("ltlab configure")}
   ${chalk.yellow("2.")} Start the lab:          ${chalk.green("ltlab start")}
-  ${chalk.yellow("3.")} Generate a scenario:    ${chalk.green("ltlab generate -e k6 -n my-test")}
-  ${chalk.yellow("4.")} Run a test:             ${chalk.green("ltlab k6 -s my-test.js")}
+  ${chalk.yellow("3.")} Run a test:             ${chalk.green("ltlab k6 -s toy-fast.js")}
+  ${chalk.yellow("4.")} Start your own:         ${chalk.green("ltlab generate -e k6 -n my-test")} ${chalk.dim("(then edit its endpoints)")}
   ${chalk.yellow("5.")} View dashboards:        ${chalk.green(`Open http://localhost:${process.env.GRAFANA_PORT || 3000}`)}
   ${chalk.yellow("6.")} View InfluxDB UI:       ${chalk.green(`Open http://localhost:${process.env.INFLUXDB_PORT_EXPORT || 8086}`)}
 
@@ -67,8 +67,9 @@ ${chalk.bold("Common Workflows:")}
   ltlab info                         ${chalk.dim("→ Check status")}
 
   ${chalk.dim("# Create and run tests")}
-  ltlab generate -e k6 -n my-test    ${chalk.dim("→ Create k6 scenario from blueprint")}
-  ltlab k6 -s my-test.js             ${chalk.dim("→ Run k6 test")}
+  ltlab k6 -s toy-fast.js            ${chalk.dim("→ Run a built-in k6 test against the toy API")}
+  ltlab generate -e k6 -n my-test    ${chalk.dim("→ Create a k6 scenario from a blueprint, then edit its endpoints")}
+  ltlab k6 -s my-test.js             ${chalk.dim("→ Run it")}
   ltlab artillery -s my-test.yml     ${chalk.dim("→ Run Artillery test")}
 
   ${chalk.dim("# Advanced testing")}

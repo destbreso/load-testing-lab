@@ -87,7 +87,7 @@ else
     echo -e "${RED}❌ Artillery metrics NOT found${NC}"
     echo "   This might indicate:"
     echo "   - Telegraf not receiving StatsD data"
-    echo "   - artillery-plugin-statsd not installed"
+    echo "   - the scenario has no publish-metrics block pointing at Telegraf"
     echo "   - Network connectivity issue"
     exit 1
 fi
