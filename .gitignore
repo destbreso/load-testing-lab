@@ -1,6 +1,7 @@
 .env
 node_modules
 
-custom
-.custom
-**/*custom*
+# Dashboards linked from projects with `ltlab dashboard link`
+grafana/dashboards/custom/
+# Local overrides of the compose file stay on your machine
+docker-compose.override.yml

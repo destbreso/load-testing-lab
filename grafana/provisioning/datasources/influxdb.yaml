@@ -1,5 +1,7 @@
 apiVersion: 1
 
+# Grafana fills in ${...} from its own environment, which the compose file
+# takes from .env, so the token lives only in .env
 datasources:
   - name: InfluxDB
     type: influxdb
@@ -9,26 +11,8 @@ datasources:
     isDefault: true
     jsonData:
       version: Flux
-      organization: myorg
-      defaultBucket: loadtests
+      organization: ${INFLUXDB_ORG}
+      defaultBucket: ${INFLUXDB_BUCKET}
       tlsSkipVerify: true
     secureJsonData:
-      token: 6jK9Va9JAtKbDmX9OXDfF5Bn7qpgsQIVpFWir_HXU91oXOr9-62bIrWLfDm_3R7AsT3eaQBSBt-o8t6ELGUDhQ==
-
-# apiVersion: 1
-
-# datasources:
-#   - name: InfluxDB
-#     type: influxdb
-#     access: proxy
-#     url: http://influxdb:8086
-#     isDefault: true
-
-#     jsonData:
-#       dbName: loadtests
-#       httpMode: POST
-
-#     secureJsonData:
-#       password: admin123
-
-#     user: admin
+      token: ${INFLUXDB_TOKEN}
