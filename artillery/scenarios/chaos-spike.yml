@@ -18,8 +18,8 @@ config:
       # Artillery's own metrics, sent over StatsD to Telegraf, which writes them
       # to InfluxDB; flushed before Artillery exits, so the last period arrives too
       - type: statsd
-        host: telegraf
-        port: 8125
+        host: "{{ $processEnvironment.STATSD_HOST }}"
+        port: "{{ $processEnvironment.STATSD_PORT }}"
         prefix: "artillery."
     # Turns the expect blocks below into checks; only failures are printed
     expect:
