@@ -26,10 +26,13 @@ config:
   
   # Plugins for enhanced functionality
   plugins:
-    statsd:
-      host: "{{ $processEnvironment.STATSD_HOST }}"
-      port: "{{ $processEnvironment.STATSD_PORT }}"
-      prefix: "artillery"
+    publish-metrics:
+      # Artillery's own metrics, sent over StatsD to Telegraf, which writes them
+      # to InfluxDB; flushed before Artillery exits, so the last period arrives too
+      - type: statsd
+        host: "{{ $processEnvironment.STATSD_HOST }}"
+        port: "{{ $processEnvironment.STATSD_PORT }}"
+        prefix: "artillery."
   
   # Performance expectations
   ensure:
@@ -38,7 +41,8 @@ config:
     p99: 1000                 # 99th percentile < 1000ms
 
 scenarios:
-  - name: "Health check flow"
+  # Scenario names travel over StatsD, which cuts a name at its first space
+  - name: "health-check-flow"
     flow:
       - get:
           url: "/api/health"

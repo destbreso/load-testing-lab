@@ -48,10 +48,13 @@ config:
       name: "Cool down"
   
   plugins:
-    statsd:
-      host: "{{ $processEnvironment.STATSD_HOST }}"
-      port: "{{ $processEnvironment.STATSD_PORT }}"
-      prefix: "artillery"
+    publish-metrics:
+      # Artillery's own metrics, sent over StatsD to Telegraf, which writes them
+      # to InfluxDB; flushed before Artillery exits, so the last period arrives too
+      - type: statsd
+        host: "{{ $processEnvironment.STATSD_HOST }}"
+        port: "{{ $processEnvironment.STATSD_PORT }}"
+        prefix: "artillery."
   
   ensure:
     maxErrorRate: 10          # Allow up to 10% errors during spike
@@ -59,8 +62,9 @@ config:
     p95: 2000                 # 95th can be higher during spike
 
 scenarios:
+  # Scenario names travel over StatsD, which cuts a name at its first space
   # Mix of endpoints to simulate realistic traffic
-  - name: "Health endpoint"
+  - name: "health-endpoint"
     weight: 3                 # 60% of traffic
     flow:
       - get:
@@ -69,7 +73,7 @@ scenarios:
             - statusCode: [200, 429]  # Accept rate limiting
       - think: "random(0,2)"
   
-  - name: "Status endpoint"
+  - name: "status-endpoint"
     weight: 1                 # 20% of traffic
     flow:
       - get:
@@ -78,7 +82,7 @@ scenarios:
             - statusCode: [200, 429]
       - think: "random(0,2)"
   
-  - name: "Info endpoint"
+  - name: "info-endpoint"
     weight: 1                 # 20% of traffic
     flow:
       - get:

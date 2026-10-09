@@ -11,13 +11,20 @@ config:
       arrivalRate: 5
       name: "Cool down"
   plugins:
-    statsd:
-      host: telegraf
-      port: 8125
-      prefix: "artillery"
+    publish-metrics:
+      # Artillery's own metrics, sent over StatsD to Telegraf, which writes them
+      # to InfluxDB; flushed before Artillery exits, so the last period arrives too
+      - type: statsd
+        host: telegraf
+        port: 8125
+        prefix: "artillery."
+    # Turns the expect blocks below into checks; only failures are printed
+    expect:
+      outputFormat: prettyError
 
 scenarios:
-  - name: "Mixed Chaos Scenario"
+  # Scenario names travel over StatsD, which cuts a name at its first space
+  - name: "mixed-chaos-scenario"
     weight: 10
     flow:
       # Random selection of chaotic endpoints
@@ -52,7 +59,7 @@ scenarios:
       # Final think time
       - think: 2
 
-  - name: "Error Resilience"
+  - name: "error-resilience"
     weight: 5
     flow:
       # Focus on error-prone endpoint

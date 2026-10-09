@@ -49,17 +49,21 @@ config:
       name: "Cool down"
   
   plugins:
-    statsd:
-      host: "{{ $processEnvironment.STATSD_HOST }}"
-      port: "{{ $processEnvironment.STATSD_PORT }}"
-      prefix: "artillery"
+    publish-metrics:
+      # Artillery's own metrics, sent over StatsD to Telegraf, which writes them
+      # to InfluxDB; flushed before Artillery exits, so the last period arrives too
+      - type: statsd
+        host: "{{ $processEnvironment.STATSD_HOST }}"
+        port: "{{ $processEnvironment.STATSD_PORT }}"
+        prefix: "artillery."
   
   ensure:
     maxErrorRate: 5           # Allow 5% errors under high load
     p95: 1000                 # More lenient threshold for ramp tests
 
 scenarios:
-  - name: "API health check"
+  # Scenario names travel over StatsD, which cuts a name at its first space
+  - name: "api-health-check"
     weight: 1
     flow:
       - get:

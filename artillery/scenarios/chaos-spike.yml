@@ -14,16 +14,25 @@ config:
       arrivalRate: 5
       name: "Recovery"
   plugins:
-    statsd:
-      host: telegraf
-      port: 8125
-      prefix: "artillery"
+    publish-metrics:
+      # Artillery's own metrics, sent over StatsD to Telegraf, which writes them
+      # to InfluxDB; flushed before Artillery exits, so the last period arrives too
+      - type: statsd
+        host: telegraf
+        port: 8125
+        prefix: "artillery."
+    # Turns the expect blocks below into checks; only failures are printed
+    expect:
+      outputFormat: prettyError
+    # Applies the ensure thresholds below and fails the run when one is missed
+    ensure: {}
   ensure:
     maxErrorRate: 60  # Allow 60% errors during chaos
     p99: 5000         # 99th percentile under 5 seconds
 
 scenarios:
-  - name: "Everything Goes Wrong"
+  # Scenario names travel over StatsD, which cuts a name at its first space
+  - name: "everything-goes-wrong"
     weight: 10
     flow:
       # Hit all problematic endpoints in sequence
@@ -55,7 +64,7 @@ scenarios:
       # Longer think time after experiencing chaos
       - think: 3
 
-  - name: "Rapid Fire Chaos"
+  - name: "rapid-fire-chaos"
     weight: 5
     flow:
       # Rapid requests to random endpoints

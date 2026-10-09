@@ -1,13 +1,34 @@
+# Arrivals that rise and fall over ten minutes; new virtual users keep
+# arriving whether or not the API keeps up
 config:
   target: "{{ $processEnvironment.TARGET_API_URL }}"
   phases:
-    - duration: 600
+    - duration: 120
+      arrivalRate: 5
+      rampTo: 20
+      name: "Traffic builds up"
+    - duration: 180
       arrivalRate: 20
+      name: "Steady"
+    - duration: 60
+      arrivalRate: 20
+      rampTo: 40
+      name: "A peak"
+    - duration: 120
+      arrivalRate: 40
+      name: "Peak holds"
+    - duration: 120
+      arrivalRate: 40
+      rampTo: 5
+      name: "Falls off"
   plugins:
-    statsd:
-      host: "{{ $processEnvironment.STATSD_HOST }}"
-      port: "{{ $processEnvironment.STATSD_PORT }}"
-      prefix: "artillery"
+    publish-metrics:
+      # Artillery's own metrics, sent over StatsD to Telegraf, which writes them
+      # to InfluxDB; flushed before Artillery exits, so the last period arrives too
+      - type: statsd
+        host: "{{ $processEnvironment.STATSD_HOST }}"
+        port: "{{ $processEnvironment.STATSD_PORT }}"
+        prefix: "artillery."
 scenarios:
   - flow:
       - get:

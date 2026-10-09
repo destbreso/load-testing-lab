@@ -4,12 +4,21 @@ config:
     - duration: 30
       arrivalRate: 50
   
-  # StatsD plugin to send metrics to Telegraf -> InfluxDB
   plugins:
-    statsd:
-      host: "{{ $processEnvironment.STATSD_HOST }}"
-      port: "{{ $processEnvironment.STATSD_PORT }}"
-      prefix: "artillery"
+    publish-metrics:
+      # Artillery's own metrics, sent over StatsD to Telegraf, which writes them
+      # to InfluxDB; flushed before Artillery exits, so the last period arrives too
+      - type: statsd
+        host: "{{ $processEnvironment.STATSD_HOST }}"
+        port: "{{ $processEnvironment.STATSD_PORT }}"
+        prefix: "artillery."
+    ensure: {}
+
+  # The same verdict as toy-fast.js: the run fails (exit code 1) when one is missed
+  ensure:
+    p95: 500
+    p99: 1000
+    maxErrorRate: 1
 
 scenarios:
   - flow:

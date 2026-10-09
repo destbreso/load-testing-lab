@@ -3,12 +3,14 @@ config:
   phases:
     - duration: 40
       arrivalRate: 15  
-  # StatsD plugin to send metrics to Telegraf -> InfluxDB
   plugins:
-    statsd:
-      host: "{{ $processEnvironment.STATSD_HOST }}"
-      port: "{{ $processEnvironment.STATSD_PORT }}"
-      prefix: "artillery"
+    publish-metrics:
+      # Artillery's own metrics, sent over StatsD to Telegraf, which writes them
+      # to InfluxDB; flushed before Artillery exits, so the last period arrives too
+      - type: statsd
+        host: "{{ $processEnvironment.STATSD_HOST }}"
+        port: "{{ $processEnvironment.STATSD_PORT }}"
+        prefix: "artillery."
 scenarios:
   - flow:
       - post:
@@ -20,8 +22,7 @@ scenarios:
             as: "jobId"
 
       - loop:
-          count: 6
-          flow:
-            - get:
-                url: "/jobs/{{ jobId }}"
-            - think: 0.6
+          - get:
+              url: "/jobs/{{ jobId }}"
+          - think: 0.6
+        count: 6

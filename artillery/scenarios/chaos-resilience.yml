@@ -11,16 +11,25 @@ config:
       arrivalRate: 5
       name: "Cool down"
   plugins:
-    statsd:
-      host: telegraf
-      port: 8125
-      prefix: "artillery"
+    publish-metrics:
+      # Artillery's own metrics, sent over StatsD to Telegraf, which writes them
+      # to InfluxDB; flushed before Artillery exits, so the last period arrives too
+      - type: statsd
+        host: telegraf
+        port: 8125
+        prefix: "artillery."
+    # Turns the expect blocks below into checks; only failures are printed
+    expect:
+      outputFormat: prettyError
+    # Applies the ensure thresholds below and fails the run when one is missed
+    ensure: {}
   ensure:
     maxErrorRate: 40
     p95: 4000
 
 scenarios:
-  - name: "Retry Logic Testing"
+  # Scenario names travel over StatsD, which cuts a name at its first space
+  - name: "retry-logic-testing"
     weight: 10
     flow:
       # Test error endpoint with retry logic
@@ -45,7 +54,7 @@ scenarios:
       
       - think: 2
 
-  - name: "Mixed Reliability"
+  - name: "mixed-reliability"
     weight: 5
     flow:
       # Test system reliability with various endpoints
