@@ -226,17 +226,7 @@ Test and Learn without external dependencies!
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    CLI[Professional CLI] --> Docker[Docker Stack]
-    Docker --> K6[k6 + xk6-influxdb]
-    Docker --> Artillery[Artillery + Telegraf]
-    K6 -->|Metrics| InfluxDB[(InfluxDB v2)]
-    Artillery -->|StatsD| Telegraf --> InfluxDB
-    InfluxDB -->|Flux Queries| Grafana[Grafana Dashboards]
-    K6 -->|HTTP| API[Your API / Toy API]
-    Artillery -->|HTTP| API
-```
+![Load Testing Lab architecture: the ltlab CLI on your workstation; k6, Artillery, Telegraf, InfluxDB, Grafana and the toy API on one Docker bridge network; your API outside it as an optional target](docs/figures/architecture.svg)
 
 **Components:**
 
@@ -247,6 +237,8 @@ flowchart LR
 - **Docker Compose** - Complete containerized stack (k6 and Artillery run only during a test)
 - **Professional CLI** - 15 commands for operations
 - **Toy API** - Built-in test endpoints
+
+One run, request by request, as an interactive simulation you can point at your own API and dashboards: [docs/figures](docs/figures/README.md).
 
 **[Detailed Architecture →](docs/README.md#architecture)**
 

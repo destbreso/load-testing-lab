@@ -5,3 +5,6 @@ node_modules
 grafana/dashboards/custom/
 # Local overrides of the compose file stay on your machine
 docker-compose.override.yml
+
+# dissect check pictures (made by build.mjs --check)
+docs/figures/shots/
