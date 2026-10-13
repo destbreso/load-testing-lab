@@ -194,7 +194,7 @@
 .dx-spec,.dx-alt-text{transition:opacity .3s}
 @media (prefers-reduced-motion:reduce){.dx *{transition:none!important;animation:none!important}}
 </style>
-<style>.dx-page{max-width:760px;margin:0 auto 28px;font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Liberation Sans",system-ui,sans-serif;color:#1d1c1a}.dx-page h1{font-size:28px;line-height:1.2;margin:8px 0 12px}@media (prefers-color-scheme:dark){.dx-page{color:#eceae4}}</style><script>(function(){if(window.parent===window)return;var last=0;function post(){var h=Math.ceil(document.documentElement.scrollHeight);if(h!==last){last=h;window.parent.postMessage({type:"dissect:height",height:h},"*")}}addEventListener("load",post);if(window.ResizeObserver)new ResizeObserver(post).observe(document.documentElement);})();</script></head>
+<style>.dx-page{max-width:760px;margin:0 auto 28px;font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Liberation Sans",system-ui,sans-serif;color:#1d1c1a}.dx-page h1{font-size:28px;line-height:1.2;margin:8px 0 12px}@media (prefers-color-scheme:dark){.dx-page{color:#eceae4}}</style><script>(function(){if(window.parent===window)return;var last=0;function post(){var h=Math.ceil(document.documentElement.getBoundingClientRect().height);if(h!==last){last=h;window.parent.postMessage({type:"dissect:height",height:h},"*")}}addEventListener("load",post);if(window.ResizeObserver)new ResizeObserver(post).observe(document.documentElement);})();</script></head>
 <body>
 <figure class="dx" id="dx-ltlab-run" data-theme="auto" data-layer="flow">
 <div class="dx-card">
@@ -3926,7 +3926,12 @@ function mount(root, def, options = {}) {
 
   function bottleneckWords(within = "") {
     const b = bottleneck(within);
-    if (!b) return within ? "Nothing has had to wait in here yet." : "Watch the queues: where items wait is where the time goes.";
+    if (!b) {
+      // where every step takes each item as it comes, nothing can wait: say so, rather than "yet"
+      const limited = [...parts.values()].some((q) => q.kind === "station" && !q.inside && (Number.isFinite(q.servers) || q.scale) && (!within || q.path.startsWith(`${within}/`)));
+      if (!limited) return within ? `Nothing waits in here: its steps take each ${noun} as it comes.` : `Nothing waits here: every step takes each ${noun} as it comes, so the time is the work itself.`;
+      return within ? "Nothing has had to wait in here yet." : "Watch the queues: where items wait is where the time goes.";
+    }
     // waiting that is a sliver of the time spent is not worth a sentence about where it is
     const s = within ? R.st.get(within) : null;
     const typical = within ? (s?.workN ? s.workSum / s.workN : 0) : R.done ? R.quantile(0.5) : 0;

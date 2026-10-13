@@ -8,6 +8,7 @@ The lab's diagrams, kept next to the code they describe.
 | [external-projects.svg](external-projects.svg) | Scenarios and dashboards that stay in your own repositories: the folders and files the lab mounts read-only into k6 and Artillery, and the dashboards it copies into a git-ignored folder that Grafana loads. |
 | [run-anatomy.svg](run-anatomy.svg) | What one run of chaos-basic.js produces: the virtual users over time, the request mix, the samples on their way to Grafana, and the two thresholds that decide pass or fail. |
 | [run.html](run.html) | The same run as an interactive simulation, request by request. |
+| [run-light.webp](run-light.webp) | A still of run.html in its light theme, for places that cannot run it. |
 
 ## The interactive run
 
